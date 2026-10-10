@@ -1,0 +1,63 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<NewDataSet>
+  <xs:schema id="NewDataSet" xmlns="" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xs:element name="NewDataSet" msdata:IsDataSet="true" msdata:MainDataTable="Customer" msdata:UseCurrentLocale="true">
+      <xs:complexType>
+        <xs:choice minOccurs="0" maxOccurs="unbounded">
+          <xs:element name="Customer">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="Id" type="xs:long" minOccurs="0" />
+                <xs:element name="FirstName" type="xs:string" minOccurs="0" />
+                <xs:element name="LastName" type="xs:string" minOccurs="0" />
+                <xs:element name="Email" type="xs:string" minOccurs="0" />
+                <xs:element name="PhoneNumber" type="xs:string" minOccurs="0" />
+                <xs:element name="Address" type="xs:string" minOccurs="0" />
+                <xs:element name="City" type="xs:string" minOccurs="0" />
+                <xs:element name="State" type="xs:string" minOccurs="0" />
+                <xs:element name="ZIP" type="xs:int" minOccurs="0" />
+                <xs:element name="RewardsPoints" type="xs:decimal" minOccurs="0" />
+                <xs:element name="ExtraField" type="xs:decimal" minOccurs="0" />
+              </xs:sequence>
+            </xs:complexType>
+          </xs:element>
+        </xs:choice>
+      </xs:complexType>
+    </xs:element>
+  </xs:schema>
+  <Customer>
+    <Id>1</Id>
+    <FirstName>John</FirstName>
+    <LastName>Doe</LastName>
+    <Email>johnDoe@maxmail.com</Email>
+    <PhoneNumber>345-231-9234</PhoneNumber>
+    <Address>312 Brackish Rd</Address>
+    <City>Boston</City>
+    <State>MA</State>
+    <ZIP>34567</ZIP> <!-- Made this field uppercase to test case insensitivity for mappings -->
+    <RewardsPoints>23.3</RewardsPoints>
+    <ExtraField>3.9</ExtraField>
+  </Customer>
+  <Customer>
+    <!--This record is missing PhoneNumber, Zip, and RewardsPoints for test purposes-->
+    <Id>2</Id>
+    <FirstName>Jake</FirstName>
+    <LastName>McPhelson</LastName>
+    <Email>Jake123@mail.com</Email>
+    <Address>64 Back Road Drive</Address>
+    <City>Houston</City>
+    <State>TX</State>
+  </Customer>
+  <Customer>
+    <!--This record is missing PhoneNumber for test purposes-->
+    <Id>3</Id>
+    <FirstName>Bob</FirstName>
+    <LastName>Jackson</LastName>
+    <Email>Bob123@vixmix.com</Email>
+    <Address>2345 Cumberland St.</Address>
+    <City>Nashville</City>
+    <State>TN</State>
+    <ZIP>37210</ZIP>
+    <RewardsPoints>0</RewardsPoints>
+  </Customer>
+</NewDataSet>

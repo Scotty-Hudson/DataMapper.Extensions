@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DataMapper.Extensions/DataMapper.Extensions.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DataMapper.Extensions.Tests/DataMapper.Extensions.Tests.csproj" />
+  </Folder>
+</Solution>
