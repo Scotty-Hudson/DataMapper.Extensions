@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
@@ -12,6 +13,10 @@ namespace DataMapper.Extensions
     ///
     /// This is the parameter half of a query layer only: nothing here executes anything. The
     /// command text, the connection lifetime and transactions remain the caller's job.
+    ///
+    /// Two members with the same name, or the same ColumnAttribute name, produce two parameters
+    /// with the same name. Providers reject duplicate parameter names, so that is a model error
+    /// this library does not try to repair.
     /// </summary>
     public static class ParameterExtensions
     {
@@ -57,15 +62,7 @@ namespace DataMapper.Extensions
         {
             if (command == null) throw new ArgumentNullException(nameof(command));
 
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = name ?? string.Empty;
-            parameter.Value = ResolveValue(value, value?.GetType() ?? typeof(object), options);
-
-            if (value != null && TryGetDbType(value.GetType(), out var dbType))
-                parameter.DbType = dbType;
-
-            command.Parameters.Add(parameter);
-            return parameter;
+            return AddParameter(command, name, value, value?.GetType() ?? typeof(object), options);
         }
 
         /// <summary>
@@ -74,7 +71,7 @@ namespace DataMapper.Extensions
         /// the same rule the mapper uses.
         /// </summary>
         /// <param name="command">The command to add the parameters to.</param>
-        /// <param name="parameters">An object, an anonymous type, or an IDictionary of name to value.</param>
+        /// <param name="parameters">An object, an anonymous type, or a dictionary of name to value.</param>
         /// <param name="options">Options. Only <see cref="MapOptions.Converter"/> is used here.</param>
         /// <returns>The number of parameters added.</returns>
         public static int AddParameters(this DbCommand command, object parameters, MapOptions options = null)
@@ -84,15 +81,24 @@ namespace DataMapper.Extensions
 
             options ??= MapOptions.Default;
 
-            if (parameters is IDictionary<string, object> dictionary)
+            // A dictionary is a set of name and value pairs, not a POCO. Checking the non-generic
+            // IDictionary as well matters: Dictionary&lt;string, int&gt; implements it but does not
+            // implement IDictionary&lt;string, object&gt;, and its properties would otherwise be
+            // bound as parameters instead of its entries.
+            if (parameters is IDictionary<string, object> generic)
             {
-                var added = 0;
-                foreach (var pair in dictionary)
-                {
-                    AddParameter(command, pair.Value, pair.Key, options);
-                    added++;
-                }
-                return added;
+                foreach (var pair in generic)
+                    AddParameter(command, pair.Key, pair.Value, pair.Value?.GetType() ?? typeof(object), options);
+
+                return generic.Count;
+            }
+
+            if (parameters is IDictionary any)
+            {
+                foreach (DictionaryEntry entry in any)
+                    AddParameter(command, entry.Key?.ToString(), entry.Value, entry.Value?.GetType() ?? typeof(object), options);
+
+                return any.Count;
             }
 
             var accessor = MemberAccessor.Create(parameters.GetType());
@@ -103,18 +109,33 @@ namespace DataMapper.Extensions
                 // Parameters are read out of the object, so read-only members count. This is the
                 // one place where the mapper's "skip members that cannot be written" rule does not
                 // apply: an anonymous type, which is what people pass here, is entirely read-only.
-                var parameter = command.CreateParameter();
-                parameter.ParameterName = member.SourceName;
-                parameter.Value = ResolveValue(member.Get(parameters), member.Type, options);
-
-                if (TryGetDbType(member.Type, out var dbType))
-                    parameter.DbType = dbType;
-
-                command.Parameters.Add(parameter);
+                AddParameter(command, member.SourceName, member.Get(parameters), member.Type, options);
                 count++;
             }
 
             return count;
+        }
+
+        private static DbParameter AddParameter(DbCommand command, string name, object value, Type declaredType, MapOptions options)
+        {
+            var parameter = command.CreateParameter();
+
+            // A dictionary key that is not a string, or a null key, can arrive here as null.
+            parameter.ParameterName = name ?? string.Empty;
+
+            var resolved = ResolveValue(value, declaredType, options);
+            parameter.Value = resolved;
+
+            // DbType has to describe the value that is actually bound. When a converter produced a
+            // different type, the declared type is no longer the right answer. When there is no
+            // value to infer from, the declared type is the only thing a provider can use.
+            var typeForDbType = resolved == DBNull.Value ? declaredType : resolved.GetType();
+
+            if (TryGetDbType(typeForDbType, out var dbType))
+                parameter.DbType = dbType;
+
+            command.Parameters.Add(parameter);
+            return parameter;
         }
 
         private static object ResolveValue(object value, Type declaredType, MapOptions options)

@@ -111,7 +111,7 @@ namespace DataMapper.Extensions.Example
             stopwatch.Stop();
             transaction.Commit();
 
-            Console.WriteLine($"Inserted {Rows} rows in {stopwatch.Elapsed.TotalMilliseconds:F1} ms.");
+            Console.WriteLine($"Inserted {Rows} rows in {stopwatch.Elapsed.TotalMilliseconds:F1} ms, commit included.");
         }
 
         private static void ReadRows(SqliteConnection connection)
@@ -215,10 +215,12 @@ namespace DataMapper.Extensions.Example
         }
 
         // A null and an empty string both print as "" in an interpolated string, so the example
-        // needs a helper that can tell them apart. Strings are quoted; other values print plainly.
+        // needs a helper that can tell them apart. Strings are quoted, DBNull is named, and other
+        // values print plainly.
         private static string Show(object value) => value switch
         {
             null => "null",
+            DBNull => "DBNull",
             string text => $"\"{text}\"",
             _ => value.ToString()
         };

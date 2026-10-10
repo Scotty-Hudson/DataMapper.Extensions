@@ -192,7 +192,16 @@ var parameter = command.AddParameter(42, "id");                        // one at
 ```
 
 Only `MapOptions.Converter` is used by the parameter methods. `NullHandling` is a mapping policy,
-and a parameter has no POCO to apply it to, so null is always `DBNull.Value`.
+and a parameter has no POCO to apply it to, so null is always `DBNull.Value`. When the converter
+returns a different type, `DbType` is set from the value it produced rather than from the declared
+member type, so the two always agree.
+
+Dictionaries are read as name and value pairs, not as a POCO. `Dictionary<string, int>` binds its
+entries, not its properties, and a key that is not a string becomes a name through `ToString()`.
+
+Two members with the same name, or the same `[Column]` name, produce two parameters with the same
+name. Providers reject duplicate parameter names, so that is a model error the library does not try
+to repair.
 
 This is the parameter half of a query layer only. Nothing here executes a command: the command
 text, the connection lifetime and transactions remain the caller's job.
@@ -291,7 +300,7 @@ dotnet test
 dotnet test -- --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml
 ```
 
-135 tests, using xUnit.net v3 with the Microsoft.Testing.Platform runner. `TestData` is a class
+141 tests, using xUnit.net v3 with the Microsoft.Testing.Platform runner. `TestData` is a class
 fixture, so each test class reads its own copy of `TestData.xml`.
 
 The test data (`TestData.xml`) holds one table per scenario: a fully populated row with
@@ -304,8 +313,9 @@ read-only and write-only members, types without a parameterless constructor, rec
 `DataRow`, `DataTable` and `IDataReader` paths, streaming, async cancellation, the reverse
 direction, and parameter binding against a minimal `DbCommand` fake.
 
-Coverage of the library is **100% of lines** and **97% of branches**. The branches that
+Coverage of the library is **100% of lines** and **96.7% of branches**. The branches that
 remain are defensive ones that cannot be reached from a public call: a public property
 with neither a getter nor a setter, `New<T>` for a value type (the generic methods are
-constrained to reference types), and the unreachable default case of the null-policy
-switch.
+constrained to reference types), the unreachable default case of the null-policy
+switch, and the null-key guard on the dictionary path, which no standard dictionary can
+trigger because they all reject null keys.

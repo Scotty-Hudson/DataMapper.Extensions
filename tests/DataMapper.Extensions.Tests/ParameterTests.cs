@@ -202,6 +202,80 @@ namespace DataMapper.Extensions.Tests
         }
 
         [Fact]
+        public void Typed_Dictionary_Uses_The_Keys_As_Names()
+        {
+            // Dictionary<string, int> does not implement IDictionary<string, object>. Without the
+            // non-generic check, its properties (Comparer, Count, Keys, Values) would be bound as
+            // parameters and the entry itself would be missing.
+            var command = NewCommand();
+            var values = new Dictionary<string, int> { ["id"] = 42 };
+
+            Assert.Equal(1, command.AddParameters(values));
+            Assert.Equal("id", Get(command, "id").ParameterName);
+            Assert.Equal(42, Get(command, "id").Value);
+            Assert.Equal(DbType.Int32, Get(command, "id").DbType);
+        }
+
+        [Fact]
+        public void Non_String_Dictionary_Keys_Are_Used_As_Names()
+        {
+            var command = NewCommand();
+            var values = new Dictionary<int, string> { [7] = "seven" };
+
+            Assert.Equal(1, command.AddParameters(values));
+            Assert.Equal("7", Get(command, "7").ParameterName);
+            Assert.Equal("seven", Get(command, "7").Value);
+        }
+
+        [Fact]
+        public void Dictionary_Entry_With_A_Null_Value_Is_DbNull()
+        {
+            var command = NewCommand();
+            var values = new Dictionary<string, object> { ["id"] = null };
+
+            Assert.Equal(1, command.AddParameters(values));
+            Assert.Equal(DBNull.Value, Get(command, "id").Value);
+        }
+
+        [Fact]
+        public void Non_Generic_Dictionary_With_A_Null_Value_Is_DbNull()
+        {
+            // A non-string key takes the non-generic path. The null key guard on that path cannot
+            // be tested because no standard dictionary accepts a null key.
+            var command = NewCommand();
+            var values = new Dictionary<int, string> { [7] = null };
+
+            Assert.Equal(1, command.AddParameters(values));
+            Assert.Equal("7", Get(command, "7").ParameterName);
+            Assert.Equal(DBNull.Value, Get(command, "7").Value);
+        }
+
+        [Fact]
+        public void Null_Enum_Member_Gets_DbType_From_Its_Underlying_Type()
+        {
+            // A null value carries no type, so the declared member type is what sets DbType here.
+            var command = NewCommand();
+            command.AddParameters(new { status = (Status?)null });
+
+            Assert.Equal(DBNull.Value, Get(command, "status").Value);
+            Assert.Equal(DbType.Int32, Get(command, "status").DbType);
+        }
+
+        [Fact]
+        public void Converter_Changing_The_Type_Sets_DbType_From_The_Converted_Value()
+        {
+            // DbType has to describe the value that is actually bound, not the declared member type.
+            var options = new MapOptions { Converter = (value, type) => type == typeof(int) ? value.ToString() : null };
+
+            var command = NewCommand();
+            command.AddParameters(new { count = 42 }, options);
+
+            var parameter = Get(command, "count");
+            Assert.Equal("42", parameter.Value);
+            Assert.Equal(DbType.String, parameter.DbType);
+        }
+
+        [Fact]
         public void Custom_Converter_Cannot_Turn_Null_Into_A_Value()
         {
             // The converter returning null falls through, so a null value is still DBNull.
