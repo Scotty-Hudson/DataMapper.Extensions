@@ -123,8 +123,10 @@ var amount = row.ConvertTo<decimal>(options, "Amount");
 
 Values are converted with `Convert.ChangeType`, except for cases it cannot handle and that the
 extensions support: nullable target types, enums, `Guid`, `TimeSpan`, `DateOnly` and `TimeOnly` from
-strings, and `DateTime` to `DateOnly` or `TimeOnly`. A value that is already the target type is
-assigned without converting. Passing `null` for the options uses the default.
+strings, `DateTime` to `DateOnly` or `TimeOnly`, and `TimeSpan` to `TimeOnly`. The last two matter
+because `DateOnly` and `TimeOnly` are not `IConvertible`, and a provider returns a date column as
+`DateTime` and a time column as `TimeSpan`. A value that is already the target type is assigned
+without converting. Passing `null` for the options uses the default.
 
 `CultureInfo.InvariantCulture` is the default. The original version used `CurrentCulture`, which
 can silently corrupt numeric data: a column value of `"1.5"` becomes `15` under a German culture.
@@ -309,7 +311,7 @@ dotnet test
 dotnet test -- --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml
 ```
 
-150 tests, using xUnit.net v3 with the Microsoft.Testing.Platform runner. `TestData` is a class
+152 tests, using xUnit.net v3 with the Microsoft.Testing.Platform runner. `TestData` is a class
 fixture, so each test class reads its own copy of `TestData.xml`.
 
 The test data (`TestData.xml`) holds one table per scenario: a fully populated row with
@@ -323,7 +325,7 @@ read-only and write-only members, types without a parameterless constructor, rec
 direction, parameter binding against a minimal `DbCommand` fake, null options, duplicate and
 null names in a reader, and the `DateOnly` and `TimeOnly` conversions.
 
-Coverage of the library is **100% of lines** and **97.5% of branches**. The branches that
+Coverage of the library is **100% of lines** and **97.4% of branches**. The branches that
 remain are defensive ones that cannot be reached from a public call: a public property
 with neither a getter nor a setter, `New<T>` for a value type (the generic methods are
 constrained to reference types), the unreachable default case of the null-policy

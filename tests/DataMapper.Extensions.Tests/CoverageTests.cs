@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -146,27 +145,45 @@ namespace DataMapper.Extensions.Tests
         }
 
         [Fact]
-        public void NullOptionsUseTheDefault()
+        public async Task NullOptionsUseTheDefaultOnEveryEntry()
         {
             var table = BuildTable(("Id", typeof(long)), ("Name", typeof(string)));
             table.Rows.Add(DBNull.Value, DBNull.Value);
 
-            var p = table.MapTo<StringOnlyPoco>((MapOptions)null)[0];
-            Assert.Equal(string.Empty, p.FirstName);
-
+            // ConvertTo
             Assert.Null(table.Rows[0].ConvertTo<long?>((MapOptions)null, "Id"));
 
-            // A nullable target that has a value. A boxed long is reported as an instance of
-            // Nullable<long>, so the first instance-of check in ConvertValue returns it.
-            table.Rows[0]["Id"] = 1L;
-            Assert.Equal(1L, table.Rows[0].ConvertTo<long?>("Id"));
+            // MapTo on a DataRow
+            Assert.Equal(string.Empty, table.Rows[0].MapTo<StringOnlyPoco>((MapOptions)null).FirstName);
 
-            // The reader path has its own option handling, so it needs its own check.
+            // EnumerateTo on a DataTable
+            Assert.Equal(string.Empty, table.EnumerateTo<StringOnlyPoco>((MapOptions)null).First().FirstName);
+
+            // EnumerateTo on a reader
+            using (var reader = table.CreateDataReader())
+                Assert.Equal(string.Empty, reader.EnumerateTo<StringOnlyPoco>((MapOptions)null).First().FirstName);
+
+            // EnumerateToAsync
             using (var reader = table.CreateDataReader())
             {
-                var r = reader.MapTo<StringOnlyPoco>((MapOptions)null)[0];
-                Assert.Equal(string.Empty, r.FirstName);
+                await foreach (var p in reader
+                    .EnumerateToAsync<StringOnlyPoco>((MapOptions)null, TestContext.Current.CancellationToken))
+                {
+                    Assert.Equal(string.Empty, p.FirstName);
+                    break;
+                }
             }
+        }
+
+        [Fact]
+        public void NullableTargetWithAValueReturnsTheValue()
+        {
+            // A boxed long is reported as an instance of Nullable<long>, so the first instance-of
+            // check in ConvertValue returns it.
+            var table = BuildTable(("Id", typeof(long)));
+            table.Rows.Add(1L);
+
+            Assert.Equal(1L, table.Rows[0].ConvertTo<long?>("Id"));
         }
 
         [Fact]
@@ -213,7 +230,18 @@ namespace DataMapper.Extensions.Tests
 
             // A DateTime value with a target that is neither of those falls through to
             // Convert.ChangeType, which is the branch the two assertions above do not reach.
-            Assert.Equal(moment.ToString(CultureInfo.InvariantCulture), table.Rows[0].ConvertTo<string>("Moment"));
+            Assert.Equal("01/01/2026 10:30:00", table.Rows[0].ConvertTo<string>("Moment"));
+        }
+
+        [Fact]
+        public void TimeOnlyFromTimeSpan()
+        {
+            // A time column comes back as TimeSpan from SqlClient, which Convert.ChangeType
+            // cannot bridge because TimeOnly is not IConvertible.
+            var table = BuildTable(("Moment", typeof(TimeSpan)));
+            table.Rows.Add(new TimeSpan(10, 30, 0));
+
+            Assert.Equal(new TimeOnly(10, 30, 0), table.Rows[0].ConvertTo<TimeOnly>("Moment"));
         }
 
         // ---------- duplicate names ----------

@@ -230,20 +230,16 @@ namespace DataMapper.Extensions
             return membersToCopy;
         }
 
+        // Options are optional on the public API, so null means the default. It is resolved once at
+        // the entry point, which is what lets the private helpers below assume non-null.
+        private static MapOptions ResolveOptions(MapOptions options) => options ?? MapOptions.Default;
+
         /// <summary>
         /// Converts a value to the target type. Handles nullable types, enums, Guid, TimeSpan,
         /// DateOnly and TimeOnly, which Convert.ChangeType alone cannot.
         /// </summary>
-        /// <remarks>
-        /// DBNull becomes null only for a target type that is nullable in the reflection sense,
-        /// which does not include <c>object</c>. ConvertTo&lt;object&gt; on a DBNull column returns
-        /// DBNull.Value. Use the defaultValue overload if you want a fallback.
-        /// </remarks>
         private static object ConvertValue(object value, Type targetType, MapOptions options)
         {
-            // Options are optional everywhere in this library, so null means the default.
-            options ??= MapOptions.Default;
-
             if (options.Converter != null)
             {
                 var converted = options.Converter(value, targetType);
@@ -280,13 +276,16 @@ namespace DataMapper.Extensions
             }
 
             // DateOnly and TimeOnly are not IConvertible, so Convert.ChangeType cannot bridge to
-            // them. Providers commonly return those columns as DateTime, which is the case this
-            // handles.
+            // them. Providers return a date column as DateTime and a time column as TimeSpan,
+            // which is why both cases are handled here.
             if (value is DateTime moment)
             {
                 if (underlyingType == typeof(DateOnly)) return DateOnly.FromDateTime(moment);
                 if (underlyingType == typeof(TimeOnly)) return TimeOnly.FromDateTime(moment);
             }
+
+            if (value is TimeSpan elapsed && underlyingType == typeof(TimeOnly))
+                return TimeOnly.FromTimeSpan(elapsed);
 
             return Convert.ChangeType(value, underlyingType, options.Culture);
         }
@@ -329,9 +328,18 @@ namespace DataMapper.Extensions
         // row loop does no name lookups at all.
         private static List<ColumnEntry> BuildColumnMap(MemberAccessor accessor, DataTable table, MapOptions options)
         {
-            options ??= MapOptions.Default;
-
             var map = new List<ColumnEntry>(accessor.GetMembers().Count);
+
+            // Built once for the table so the member loop does one lookup per member instead of a
+            // scan per member. Last match wins, which is the rule the reader path uses for
+            // duplicate names.
+            Dictionary<string, DataColumn> normalizedLookup = options.MatchNormalizedNames
+                ? new Dictionary<string, DataColumn>()
+                : null;
+
+            if (normalizedLookup != null)
+                foreach (DataColumn candidate in table.Columns)
+                    normalizedLookup[Normalize(candidate.ColumnName)] = candidate;
 
             foreach (var member in accessor.GetMembers())
             {
@@ -340,13 +348,8 @@ namespace DataMapper.Extensions
                 var name = member.SourceName;
                 var column = table.Columns.Contains(name) ? table.Columns[name] : null;
 
-                if (column == null && options.MatchNormalizedNames)
-                {
-                    // Last match wins, which is the rule the reader path uses for duplicate names.
-                    var target = Normalize(name);
-                    foreach (DataColumn candidate in table.Columns)
-                        if (Normalize(candidate.ColumnName) == target) column = candidate;
-                }
+                if (column == null && normalizedLookup != null)
+                    normalizedLookup.TryGetValue(Normalize(name), out column);
 
                 map.Add(new ColumnEntry(member, column));
             }
@@ -358,8 +361,6 @@ namespace DataMapper.Extensions
         // allocates a boxed enumerator for every row.
         private static T MapRow<T>(DataRow row, T poco, List<ColumnEntry> map, MapOptions options) where T : class
         {
-            options ??= MapOptions.Default;
-
             for (var i = 0; i < map.Count; i++)
             {
                 var entry = map[i];
@@ -387,9 +388,8 @@ namespace DataMapper.Extensions
 
         private static List<FieldEntry> BuildFieldMap(MemberAccessor accessor, IDataReader reader, MapOptions options)
         {
-            options ??= MapOptions.Default;
-
             // Cache the field names in the reader for use in our while loop for efficiency.
+            // Duplicate names take the last occurrence, the same rule BuildColumnMap uses.
             var readerFieldLookup = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             Dictionary<string, int> normalizedLookup = options.MatchNormalizedNames
                 ? new Dictionary<string, int>()
@@ -424,8 +424,6 @@ namespace DataMapper.Extensions
 
         private static T MapRecord<T>(IDataRecord record, T poco, List<FieldEntry> map, MapOptions options) where T : class
         {
-            options ??= MapOptions.Default;
-
             for (var i = 0; i < map.Count; i++)
             {
                 var entry = map[i];
@@ -487,6 +485,11 @@ namespace DataMapper.Extensions
         /// <summary>
         /// Converts a column value to <typeparamref name="T"/>.
         /// </summary>
+        /// <remarks>
+        /// DBNull becomes null only for a target type that is nullable in the reflection sense,
+        /// which does not include <c>object</c>. ConvertTo&lt;object&gt; on a DBNull column returns
+        /// DBNull.Value. Use the defaultValue overload if you want a fallback.
+        /// </remarks>
         public static T ConvertTo<T>(this DataRow row, string columnName)
             => (T)ConvertValue(row[columnName], typeof(T), MapOptions.Default);
 
@@ -506,7 +509,7 @@ namespace DataMapper.Extensions
         /// ConvertTo&lt;T&gt;(row, columnName, defaultValue) overload.
         /// </summary>
         public static T ConvertTo<T>(this DataRow row, MapOptions options, string columnName)
-            => (T)ConvertValue(row[columnName], typeof(T), options);
+            => (T)ConvertValue(row[columnName], typeof(T), ResolveOptions(options));
 
         /// <summary>
         /// Maps a DataRow to a new POCO. Column names are matched to property names
@@ -533,7 +536,10 @@ namespace DataMapper.Extensions
         /// Maps a DataRow onto <paramref name="defaultPoco"/> using the given options.
         /// </summary>
         public static T MapTo<T>(this DataRow row, T defaultPoco, MapOptions options) where T : class
-            => MapRow(row, defaultPoco, BuildColumnMap(MemberAccessor.Create(typeof(T)), row.Table, options), options);
+        {
+            options = ResolveOptions(options);
+            return MapRow(row, defaultPoco, BuildColumnMap(MemberAccessor.Create(typeof(T)), row.Table, options), options);
+        }
 
         /// <summary>
         /// Maps every row of a DataTable to a new POCO and returns the list.
@@ -577,6 +583,8 @@ namespace DataMapper.Extensions
         /// </summary>
         public static IEnumerable<T> EnumerateTo<T>(this DataTable table, T defaultPoco, MapOptions options) where T : class
         {
+            options = ResolveOptions(options);
+
             var accessor = MemberAccessor.Create(typeof(T));
             var map = BuildColumnMap(accessor, table, options);
             var membersToCopy = MembersToCopy(accessor, defaultPoco);
@@ -629,6 +637,8 @@ namespace DataMapper.Extensions
         /// </summary>
         public static IEnumerable<T> EnumerateTo<T>(this IDataReader reader, T defaultPoco, MapOptions options) where T : class
         {
+            options = ResolveOptions(options);
+
             var accessor = MemberAccessor.Create(typeof(T));
             var map = BuildFieldMap(accessor, reader, options);
             var membersToCopy = MembersToCopy(accessor, defaultPoco);
@@ -652,6 +662,8 @@ namespace DataMapper.Extensions
         public static async IAsyncEnumerable<T> EnumerateToAsync<T>(this DbDataReader reader, T defaultPoco, MapOptions options,
             [EnumeratorCancellation] CancellationToken cancellationToken = default) where T : class
         {
+            options = ResolveOptions(options);
+
             var accessor = MemberAccessor.Create(typeof(T));
             var map = BuildFieldMap(accessor, reader, options);
             var membersToCopy = MembersToCopy(accessor, defaultPoco);
