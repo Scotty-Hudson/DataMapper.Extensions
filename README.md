@@ -197,6 +197,47 @@ and a parameter has no POCO to apply it to, so null is always `DBNull.Value`.
 This is the parameter half of a query layer only. Nothing here executes a command: the command
 text, the connection lifetime and transactions remain the caller's job.
 
+## Example
+
+`examples/DataMapper.Extensions.Example` is a console app that runs against an in-memory SQLite
+database. It is the only project in the repo with a package dependency (`Microsoft.Data.Sqlite`);
+the library itself still has none.
+
+```bash
+dotnet run --project examples/DataMapper.Extensions.Example
+```
+
+It shows the attributes driving both directions, the parameter builder on an anonymous type, and
+the null policy on a value that comes back null:
+
+```
+Parameters built from the model:
+  account_id = 1 (Int64)
+  display_name = "Scot" (String)
+  status = 0 (Int32)
+  account_key = 939188a3-ef9c-48e7-aa50-033a610b10f2 (Guid)
+  balance = 120 (Int32)
+  duration = 01:30:00 (String)
+  created_on = 1/15/2026 9:30:00 AM (String)
+  is_active = True (Boolean)
+Inserted 2 rows.
+
+Parameters bound for the query:
+  status = 0 (Int32)
+
+Mapped rows:
+  1 Scot Active 939188a3-ef9c-48e7-aa50-033a610b10f2 120 01:30:00 2026-01-15T09:30:00.0000000 True
+
+Null policy on a null display_name:
+  default (EmptyString): ""
+  NullHandling.Null:     null
+```
+
+The `String` shown for `duration` and `created_on` is Microsoft.Data.Sqlite inferring the type from
+the value, which is how it stores them; the library leaves those at `DbType.Object`. SQLite has no
+real column types, so a text column reads back as a string, which is what exercises the `Guid`,
+`TimeSpan` and `DateTime` conversions from strings.
+
 ## ConvertTo
 
 ```c#
