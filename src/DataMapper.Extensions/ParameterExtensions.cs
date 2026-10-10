@@ -55,14 +55,17 @@ namespace DataMapper.Extensions
         /// <param name="options">Options. Only <see cref="MapOptions.Converter"/> is used here.</param>
         /// <remarks>
         /// A null argument carries no type, so DbType is left at Object. When the declared type is
-        /// known, use the object overload instead: it sets DbType from the member type even when
-        /// the value is null, which is what providers need for a null parameter.
+        /// known, use the <see cref="AddParameters"/> overload instead: it sets DbType from the
+        /// member type even when the value is null, which is what providers need for a null
+        /// parameter.
         /// </remarks>
         public static DbParameter AddParameter(this DbCommand command, object value, string name = null, MapOptions options = null)
         {
             if (command == null) throw new ArgumentNullException(nameof(command));
 
-            return AddResolvedParameter(command, name, value, value?.GetType() ?? typeof(object), options);
+            var parameter = BuildParameter(command, name, value, value?.GetType() ?? typeof(object), options);
+            command.Parameters.Add(parameter);
+            return parameter;
         }
 
         /// <summary>
@@ -88,7 +91,7 @@ namespace DataMapper.Extensions
             if (parameters is IDictionary<string, object> generic)
             {
                 foreach (var pair in generic)
-                    AddResolvedParameter(command, pair.Key, pair.Value, pair.Value?.GetType() ?? typeof(object), options);
+                    command.Parameters.Add(BuildParameter(command, pair.Key, pair.Value, pair.Value?.GetType() ?? typeof(object), options));
 
                 return generic.Count;
             }
@@ -96,7 +99,7 @@ namespace DataMapper.Extensions
             if (parameters is IDictionary any)
             {
                 foreach (DictionaryEntry entry in any)
-                    AddResolvedParameter(command, entry.Key?.ToString(), entry.Value, entry.Value?.GetType() ?? typeof(object), options);
+                    command.Parameters.Add(BuildParameter(command, entry.Key?.ToString(), entry.Value, entry.Value?.GetType() ?? typeof(object), options));
 
                 return any.Count;
             }
@@ -109,16 +112,16 @@ namespace DataMapper.Extensions
                 // Parameters are read out of the object, so read-only members count. This is the
                 // one place where the mapper's "skip members that cannot be written" rule does not
                 // apply: an anonymous type, which is what people pass here, is entirely read-only.
-                AddResolvedParameter(command, member.SourceName, member.Get(parameters), member.Type, options);
+                command.Parameters.Add(BuildParameter(command, member.SourceName, member.Get(parameters), member.Type, options));
                 count++;
             }
 
             return count;
         }
 
-        // Named to keep it distinct from the public AddParameter, whose value and name arguments
-        // are in the opposite order.
-        private static DbParameter AddResolvedParameter(DbCommand command, string name, object value, Type declaredType, MapOptions options)
+        // Builds one parameter. Named to match BuildColumnMap and BuildFieldMap: it builds and
+        // returns, and the caller adds it to the collection.
+        private static DbParameter BuildParameter(DbCommand command, string name, object value, Type declaredType, MapOptions options)
         {
             var parameter = command.CreateParameter();
 
@@ -137,7 +140,6 @@ namespace DataMapper.Extensions
             if (TryGetDbType(typeForDbType, out var dbType))
                 parameter.DbType = dbType;
 
-            command.Parameters.Add(parameter);
             return parameter;
         }
 

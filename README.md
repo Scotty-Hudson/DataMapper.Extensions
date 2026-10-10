@@ -218,7 +218,8 @@ dotnet run --project examples/DataMapper.Extensions.Example
 
 It inserts 1,000 rows in one transaction, streams them back with `EnumerateTo`, and shows the null
 policy and the default POCO across the whole result set rather than on a single row. Output from a
-run on the machine this was developed on:
+run on the machine this was developed on. The timings vary by machine and by run, so the numbers
+below are illustrative:
 
 ```
 Parameters built from the model:
