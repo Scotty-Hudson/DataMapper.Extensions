@@ -5,25 +5,28 @@ using System.IO;
 namespace DataMapper.Extensions.Tests
 {
     /// <summary>
-    /// TestData.xml is read once and exposes one table per scenario.
+    /// TestData.xml, read once per test class.
+    ///
+    /// This is a class fixture rather than a static: DataTable is not thread safe, and xUnit
+    /// runs test classes in parallel by default, so a shared DataSet would let two classes
+    /// race on the same table. Each class gets its own copy.
     /// </summary>
-    public static class TestData
+    public sealed class TestData
     {
-        private static readonly DataSet DataSet = Load();
+        private readonly DataSet _dataSet;
 
-        public static DataTable Customer => DataSet.Tables["Customer"];
-        public static DataTable Account => DataSet.Tables["Account"];
-        public static DataTable SnakeCaseRecord => DataSet.Tables["SnakeCaseRecord"];
-        public static DataTable FieldOnlyRecord => DataSet.Tables["FieldOnlyRecord"];
-        public static DataTable BadData => DataSet.Tables["BadData"];
-
-        private static DataSet Load()
+        public TestData()
         {
-            var dataSet = new DataSet();
-            dataSet.ReadXml(Path.Combine(AppContext.BaseDirectory, "TestData.xml"));
-            return dataSet;
+            _dataSet = new DataSet();
+            _dataSet.ReadXml(Path.Combine(AppContext.BaseDirectory, "TestData.xml"));
         }
 
-        public static DataRow Row(DataTable table, long id) => table.Select($"Id = {id}")[0];
+        public DataTable Customer => _dataSet.Tables["Customer"];
+        public DataTable Account => _dataSet.Tables["Account"];
+        public DataTable SnakeCaseRecord => _dataSet.Tables["SnakeCaseRecord"];
+        public DataTable FieldOnlyRecord => _dataSet.Tables["FieldOnlyRecord"];
+        public DataTable BadData => _dataSet.Tables["BadData"];
+
+        public DataRow Row(DataTable table, long id) => table.Select($"Id = {id}")[0];
     }
 }

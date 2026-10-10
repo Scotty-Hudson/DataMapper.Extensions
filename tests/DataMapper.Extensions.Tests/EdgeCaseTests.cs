@@ -1,15 +1,17 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Globalization;
-using System.Linq;
 using Xunit;
 using DataMapper.Extensions;
 
 namespace DataMapper.Extensions.Tests
 {
-    public class EdgeCaseTests
+    public class EdgeCaseTests : IClassFixture<TestData>
     {
+        private readonly TestData _data;
+
+        public EdgeCaseTests(TestData data) => _data = data;
+
         private static DataTable BuildTable(params (string Name, Type Type)[] columns)
         {
             var table = new DataTable();
@@ -22,7 +24,7 @@ namespace DataMapper.Extensions.Tests
         [Fact]
         public void FullRow_MapsEveryDataType()
         {
-            var c = TestData.Row(TestData.Customer, 1).MapTo<Customer>();
+            var c = _data.Row(_data.Customer, 1).MapTo<Customer>();
 
             Assert.Equal(1L, c.Id);
             Assert.Equal("John", c.FirstName);
@@ -51,9 +53,20 @@ namespace DataMapper.Extensions.Tests
         [Fact]
         public void ColumnsThatAreNotMembersOfThePocoAreIgnored()
         {
-            // ExtraField is a column but not a member of Customer.
-            var c = TestData.Row(TestData.Customer, 1).MapTo<Customer>();
-            Assert.Equal("John", c.FirstName);
+            // ExtraField is a column but not a member of Customer. Mapping the same row with
+            // and without that column has to give the same result.
+            var withColumn = BuildTable(("Id", typeof(long)), ("FirstName", typeof(string)), ("ExtraField", typeof(decimal)));
+            withColumn.Rows.Add(1L, "John", 3.9m);
+
+            var withoutColumn = BuildTable(("Id", typeof(long)), ("FirstName", typeof(string)));
+            withoutColumn.Rows.Add(1L, "John");
+
+            var mapped = withColumn.Rows[0].MapTo<StringOnlyPoco>();
+            var baseline = withoutColumn.Rows[0].MapTo<StringOnlyPoco>();
+
+            Assert.Equal(baseline.Id, mapped.Id);
+            Assert.Equal(baseline.FirstName, mapped.FirstName);
+            Assert.Equal(baseline.LastName, mapped.LastName);
         }
 
         [Fact]
@@ -70,7 +83,7 @@ namespace DataMapper.Extensions.Tests
         [Fact]
         public void BoundaryValuesSurviveMapping()
         {
-            var c = TestData.Row(TestData.Customer, 4).MapTo<Customer>();
+            var c = _data.Row(_data.Customer, 4).MapTo<Customer>();
 
             Assert.Equal(int.MaxValue, c.Zip);
             Assert.Equal(-9999.99m, c.RewardsPoints);
@@ -86,7 +99,7 @@ namespace DataMapper.Extensions.Tests
         [Fact]
         public void SparseRow_KeepsDefaultsAndAppliesTheNullStringRule()
         {
-            var c = TestData.Row(TestData.Customer, 2).MapTo<Customer>();
+            var c = _data.Row(_data.Customer, 2).MapTo<Customer>();
 
             Assert.Equal("Jake", c.FirstName);
             Assert.Equal(0, c.Zip);
@@ -106,7 +119,7 @@ namespace DataMapper.Extensions.Tests
         [Fact]
         public void EmptyStringsAreNotTreatedAsMissing()
         {
-            var p = TestData.Row(TestData.Customer, 3).MapTo<StringOnlyPoco>();
+            var p = _data.Row(_data.Customer, 3).MapTo<StringOnlyPoco>();
             Assert.Equal("Bob", p.FirstName);
             Assert.Equal(string.Empty, p.LastName);
         }
@@ -114,7 +127,7 @@ namespace DataMapper.Extensions.Tests
         [Fact]
         public void RowWithOnlyTheKeyMapsEverythingElseToDefaults()
         {
-            var c = TestData.Row(TestData.Customer, 9).MapTo<Customer>();
+            var c = _data.Row(_data.Customer, 9).MapTo<Customer>();
             Assert.Equal(9L, c.Id);
             Assert.Equal(string.Empty, c.FirstName);
             Assert.Equal(0, c.Zip);
@@ -126,25 +139,25 @@ namespace DataMapper.Extensions.Tests
         [Fact]
         public void InvalidEnumTextThrows()
         {
-            Assert.Throws<ArgumentException>(() => TestData.Row(TestData.BadData, 5).ConvertTo<Status>("Status"));
+            Assert.Throws<ArgumentException>(() => _data.Row(_data.BadData, 5).ConvertTo<Status>("Status"));
         }
 
         [Fact]
         public void InvalidGuidTextThrows()
         {
-            Assert.Throws<FormatException>(() => TestData.Row(TestData.BadData, 5).ConvertTo<Guid>("CustomerKey"));
+            Assert.Throws<FormatException>(() => _data.Row(_data.BadData, 5).ConvertTo<Guid>("CustomerKey"));
         }
 
         [Fact]
         public void InvalidTimeSpanTextThrows()
         {
-            Assert.Throws<FormatException>(() => TestData.Row(TestData.BadData, 5).ConvertTo<TimeSpan>("Duration"));
+            Assert.Throws<FormatException>(() => _data.Row(_data.BadData, 5).ConvertTo<TimeSpan>("Duration"));
         }
 
         [Fact]
         public void EmptyTextForEnumGuidAndTimeSpanThrows()
         {
-            var row = TestData.Row(TestData.BadData, 6);
+            var row = _data.Row(_data.BadData, 6);
             Assert.Throws<ArgumentException>(() => row.ConvertTo<Status>("Status"));
             Assert.Throws<FormatException>(() => row.ConvertTo<Guid>("CustomerKey"));
             Assert.Throws<FormatException>(() => row.ConvertTo<TimeSpan>("Duration"));
@@ -154,9 +167,9 @@ namespace DataMapper.Extensions.Tests
         public void MappingARowWithBadDataThrows()
         {
             // Single-member POCOs so the failure is not dependent on reflection order.
-            Assert.Throws<ArgumentException>(() => TestData.Row(TestData.BadData, 5).MapTo<EnumOnlyPoco>());
-            Assert.Throws<FormatException>(() => TestData.Row(TestData.BadData, 5).MapTo<GuidOnlyPoco>());
-            Assert.Throws<FormatException>(() => TestData.Row(TestData.BadData, 5).MapTo<TimeSpanOnlyPoco>());
+            Assert.Throws<ArgumentException>(() => _data.Row(_data.BadData, 5).MapTo<EnumOnlyPoco>());
+            Assert.Throws<FormatException>(() => _data.Row(_data.BadData, 5).MapTo<GuidOnlyPoco>());
+            Assert.Throws<FormatException>(() => _data.Row(_data.BadData, 5).MapTo<TimeSpanOnlyPoco>());
         }
 
         [Fact]
@@ -170,131 +183,48 @@ namespace DataMapper.Extensions.Tests
         [Fact]
         public void NumericTextIsNotAValidBoolean()
         {
-            Assert.Throws<FormatException>(() => TestData.Row(TestData.Customer, 7).ConvertTo<bool>("FlagText"));
+            Assert.Throws<FormatException>(() => _data.Row(_data.Customer, 7).ConvertTo<bool>("FlagText"));
         }
 
         [Fact]
         public void ConvertToOnAMissingColumnThrows()
         {
-            Assert.Throws<ArgumentException>(() => TestData.Row(TestData.Customer, 1).ConvertTo<string>("Nope"));
+            Assert.Throws<ArgumentException>(() => _data.Row(_data.Customer, 1).ConvertTo<string>("Nope"));
         }
 
         [Fact]
         public void ConvertToOnDBNullForANonNullableValueTypeThrows()
         {
-            Assert.Throws<InvalidCastException>(() => TestData.Row(TestData.Customer, 2).ConvertTo<int>(nameof(Customer.Zip)));
+            Assert.Throws<InvalidCastException>(() => _data.Row(_data.Customer, 2).ConvertTo<int>(nameof(Customer.Zip)));
         }
 
         [Fact]
         public void ConvertToOnDBNullForANullableTargetReturnsNull()
         {
-            Assert.Null(TestData.Row(TestData.Customer, 2).ConvertTo<int?>(nameof(Customer.Zip)));
-            Assert.Null(TestData.Row(TestData.Customer, 2).ConvertTo<decimal?>(nameof(Customer.RewardsPoints)));
+            Assert.Null(_data.Row(_data.Customer, 2).ConvertTo<int?>(nameof(Customer.Zip)));
+            Assert.Null(_data.Row(_data.Customer, 2).ConvertTo<decimal?>(nameof(Customer.RewardsPoints)));
         }
 
         [Fact]
         public void ConvertToOnDBNullForAStringReturnsEmpty()
         {
-            Assert.Equal(string.Empty, TestData.Row(TestData.Customer, 2).ConvertTo<string>(nameof(Customer.PhoneNumber)));
+            Assert.Equal(string.Empty, _data.Row(_data.Customer, 2).ConvertTo<string>(nameof(Customer.PhoneNumber)));
         }
 
         [Fact]
         public void ConvertToDefaultValueIsUsedForDBNull()
         {
-            Assert.Equal(11111, TestData.Row(TestData.Customer, 2).ConvertTo(nameof(Customer.Zip), 11111));
+            Assert.Equal(11111, _data.Row(_data.Customer, 2).ConvertTo(nameof(Customer.Zip), 11111));
         }
-
-        // ---------- culture ----------
-
-        [Fact]
-        public void DecimalTextIsReadWithInvariantCultureByDefault()
-        {
-            Assert.Equal(1.5m, TestData.Row(TestData.Customer, 7).ConvertTo<decimal>("AmountText"));
-        }
-
-        [Fact]
-        public void DecimalTextIsReadWithTheCultureFromTheOptions()
-        {
-            var german = new MapOptions { Culture = CultureInfo.GetCultureInfo("de-DE") };
-            Assert.Equal(15m, TestData.Row(TestData.Customer, 7).ConvertTo<decimal>(german, "AmountText"));
-        }
-
-        [Fact]
-        public void EnumStoredAsANumberIsMapped()
-        {
-            Assert.Equal(Status.Inactive, TestData.Row(TestData.Customer, 7).ConvertTo<Status>("Status"));
-        }
-
-        // ---------- converter ----------
-
-        [Fact]
-        public void CustomConverterTrimsWhitespace()
-        {
-            var options = new MapOptions
-            {
-                Converter = (value, targetType) => targetType == typeof(string) ? value.ToString().Trim() : null
-            };
-
-            var p = TestData.Row(TestData.Customer, 8).MapTo<StringOnlyPoco>(options);
-            Assert.Equal("padded", p.FirstName);
-            Assert.Equal(string.Empty, p.LastName);
-        }
-
-        // ---------- attributes ----------
-
-        [Fact]
-        public void ColumnAttributesMapDatabaseStyleNames()
-        {
-            var account = TestData.Account.Rows[0].MapTo<Account>();
-            Assert.Equal(1L, account.Id);
-            Assert.Equal("John Doe", account.DisplayName);
-            Assert.Equal("a note", account.Note);
-        }
-
-        [Fact]
-        public void IgnoreMemberAttributeSkipsMember()
-        {
-            var account = TestData.Account.Rows[0].MapTo<Account>();
-            Assert.Equal("should be ignored", TestData.Account.Rows[0]["Secret"]);
-            Assert.Null(account.Secret);
-        }
-
-        [Fact]
-        public void AttributeMappedColumnsFallBackToDefaultsWhenMissing()
-        {
-            var account = TestData.Account.Rows[1].MapTo<Account>();
-            Assert.Equal(2L, account.Id);
-            Assert.Equal(string.Empty, account.DisplayName);
-        }
-
-        // ---------- normalized names ----------
-
-        [Fact]
-        public void NormalizedNamesMatchSnakeCaseColumns()
-        {
-            var p = TestData.SnakeCaseRecord.Rows[0].MapTo<Customer>(new MapOptions { MatchNormalizedNames = true });
-            Assert.Equal("John", p.FirstName);
-            Assert.Equal(23.3m, p.RewardsPoints);
-        }
-
-        [Fact]
-        public void NormalizedNamesAreOffByDefault()
-        {
-            var p = TestData.SnakeCaseRecord.Rows[0].MapTo<Customer>();
-            Assert.Equal(string.Empty, p.FirstName);
-            Assert.Null(p.RewardsPoints);
-        }
-
-        // ---------- member shapes ----------
 
         [Fact]
         public void PublicFieldsAreMapped()
         {
-            var record = TestData.FieldOnlyRecord.Rows[0].MapTo<FieldOnlyRecord>();
+            var record = _data.FieldOnlyRecord.Rows[0].MapTo<FieldOnlyRecord>();
             Assert.Equal(1L, record.Id);
             Assert.Equal("Field Person", record.Name);
 
-            var second = TestData.FieldOnlyRecord.Rows[1].MapTo<FieldOnlyRecord>();
+            var second = _data.FieldOnlyRecord.Rows[1].MapTo<FieldOnlyRecord>();
             Assert.Equal(2L, second.Id);
             Assert.Equal(string.Empty, second.Name);
         }
@@ -359,7 +289,7 @@ namespace DataMapper.Extensions.Tests
         {
             // Row 9 has only the key, so every template value has to survive.
             var template = new Customer { Zip = -1, FirstName = "template", Status = Status.Inactive };
-            var c = TestData.Row(TestData.Customer, 9).MapTo(template);
+            var c = _data.Row(_data.Customer, 9).MapTo(template);
 
             Assert.Equal(9L, c.Id);
             Assert.Equal(-1, c.Zip);
@@ -371,7 +301,7 @@ namespace DataMapper.Extensions.Tests
         public void EveryRowGetsItsOwnInstanceSeededFromTheTemplate()
         {
             var template = new Customer { Zip = -1 };
-            var rows = TestData.Customer.MapTo(template, new MapOptions { NullHandling = NullHandling.Keep });
+            var rows = _data.Customer.MapTo(template, new MapOptions { NullHandling = NullHandling.Keep });
 
             Assert.Equal(7, rows.Count);
             Assert.NotSame(rows[0], rows[1]);
@@ -384,7 +314,7 @@ namespace DataMapper.Extensions.Tests
         [Fact]
         public void ReaderMapsAllDataTypes()
         {
-            using (var reader = TestData.Customer.CreateDataReader())
+            using (var reader = _data.Customer.CreateDataReader())
             {
                 var list = reader.MapTo<Customer>();
                 var first = list[0];
@@ -467,7 +397,7 @@ namespace DataMapper.Extensions.Tests
         public void ToDataTableWithNoRowsProducesColumnsOnly()
         {
             var table = new List<Customer>().ToDataTable();
-            Assert.Equal(20, table.Columns.Count);
+            Assert.Equal(typeof(Customer).GetProperties().Length, table.Columns.Count);
             Assert.Equal(0, table.Rows.Count);
         }
 

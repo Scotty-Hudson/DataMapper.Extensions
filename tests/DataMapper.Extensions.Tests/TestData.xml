@@ -56,6 +56,10 @@
                 <xs:element name="account_id" type="xs:long" minOccurs="0" />
                 <xs:element name="display_name" type="xs:string" minOccurs="0" />
                 <xs:element name="Secret" type="xs:string" minOccurs="0" />
+                <xs:element name="Status" type="xs:string" minOccurs="0" />
+                <xs:element name="Key" type="xs:string" minOccurs="0" />
+                <xs:element name="Balance" type="xs:int" minOccurs="0" />
+                <xs:element name="Duration" type="xs:string" minOccurs="0" />
                 <xs:element name="Note" type="xs:string" minOccurs="0" />
               </xs:sequence>
             </xs:complexType>
@@ -194,12 +198,16 @@
     <account_id>1</account_id>
     <display_name>John Doe</display_name>
     <Secret>should be ignored</Secret>
+    <Status>Inactive</Status>
+    <Key>8a0f1c2e-1111-2222-3333-444455556666</Key>
+    <Balance>100</Balance>
+    <Duration>01:23:45</Duration>
     <Note>a note</Note>
   </Account>
 
   <Account>
     <account_id>2</account_id>
-    <!-- display_name, Secret and Note missing -->
+    <!-- every other column is missing -->
   </Account>
 
   <SnakeCaseRecord>

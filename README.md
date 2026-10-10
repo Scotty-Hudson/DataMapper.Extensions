@@ -143,6 +143,21 @@ var zip = row.ConvertTo("Zip", 0);            // default when the column is DBNu
 var amount = row.ConvertTo<decimal>(options, "Amount");
 ```
 
+`DBNull` becomes `null` for a nullable target type. For a non-nullable target it converts as it
+always has, which for a string is an empty string. `NullHandling` is a mapping policy and does not
+apply to `ConvertTo`; use the `defaultValue` overload for a fallback.
+
+## Changes from the original
+
+- `CultureInfo.InvariantCulture` is the default culture, because `CurrentCulture` can silently
+  corrupt numeric data.
+- The `nullStringsToEmpty` flag is replaced by the `NullHandling` policy.
+- `ConvertTo<T>` on `DBNull` returns `null` for a nullable target type instead of throwing
+  `InvalidCastException`. Non-nullable targets are unchanged.
+- Indexers on a POCO are skipped. They used to throw when the accessor built its delegates.
+- `ConvertTo<T>(row, columnName, MapOptions)` takes the options first, so it cannot be confused
+  with the default-value overload.
+
 ## Performance
 
 Member access uses compiled expression-tree delegates generated once per type and cached. The
@@ -162,7 +177,8 @@ dotnet test
 dotnet test -- --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml
 ```
 
-112 tests, using xUnit.net v3 with the Microsoft.Testing.Platform runner.
+104 tests, using xUnit.net v3 with the Microsoft.Testing.Platform runner. `TestData` is a class
+fixture, so each test class reads its own copy of `TestData.xml`.
 
 The test data (`TestData.xml`) holds one table per scenario: a fully populated row with
 every data type the mapper can produce, a sparse row, empty strings, boundary values,

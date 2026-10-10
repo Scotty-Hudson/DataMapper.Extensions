@@ -6,112 +6,101 @@ using DataMapper.Extensions;
 
 namespace DataMapper.Extensions.Tests
 {
-    public class MappingTests
+    /// <summary>
+    /// Column names, attributes, options and the custom converter. Data shapes and failure
+    /// paths are in EdgeCaseTests.
+    /// </summary>
+    public class MappingTests : IClassFixture<TestData>
     {
-        private static DataTable BuildTable()
-        {
-            var table = new DataTable("Account");
-            table.Columns.Add("account_id", typeof(long));
-            table.Columns.Add("display_name", typeof(string));
-            table.Columns.Add("Secret", typeof(string));
-            table.Columns.Add("Status", typeof(string));
-            table.Columns.Add("Key", typeof(string));
-            table.Columns.Add("Balance", typeof(int));
-            table.Columns.Add("Duration", typeof(string));
-            table.Columns.Add("Note", typeof(string));
+        private readonly TestData _data;
 
-            table.Rows.Add(1L, "John Doe", "should be ignored", "Inactive",
-                "8a0f1c2e-1111-2222-3333-444455556666", DBNull.Value, "01:23:45", "a note");
-
-            return table;
-        }
+        public MappingTests(TestData data) => _data = data;
 
         [Fact]
         public void ColumnAttributeMapsDifferentColumnName()
         {
-            var account = BuildTable().Rows[0].MapTo<Account>();
+            var account = _data.Account.Rows[0].MapTo<Account>();
             Assert.Equal(1L, account.Id);
             Assert.Equal("John Doe", account.DisplayName);
+
+            // Public fields are mapped as well as properties.
+            Assert.Equal("a note", account.Note);
         }
 
         [Fact]
         public void IgnoreMemberAttributeSkipsMember()
         {
-            var account = BuildTable().Rows[0].MapTo<Account>();
+            var account = _data.Account.Rows[0].MapTo<Account>();
+            Assert.Equal("should be ignored", _data.Account.Rows[0]["Secret"]);
             Assert.Null(account.Secret);
         }
 
         [Fact]
-        public void MapsPublicFields()
+        public void AttributeMappedColumnsFallBackToDefaultsWhenMissing()
         {
-            var account = BuildTable().Rows[0].MapTo<Account>();
-            Assert.Equal("a note", account.Note);
+            var account = _data.Account.Rows[1].MapTo<Account>();
+            Assert.Equal(2L, account.Id);
+            Assert.Equal(string.Empty, account.DisplayName);
         }
 
         [Fact]
         public void MapsEnumsFromString()
         {
-            var account = BuildTable().Rows[0].MapTo<Account>();
-            Assert.Equal(Status.Inactive, account.Status);
+            Assert.Equal(Status.Inactive, _data.Account.Rows[0].MapTo<Account>().Status);
         }
 
         [Fact]
         public void MapsGuidFromString()
         {
-            var account = BuildTable().Rows[0].MapTo<Account>();
-            Assert.Equal(new Guid("8a0f1c2e-1111-2222-3333-444455556666"), account.Key);
+            Assert.Equal(new Guid("8a0f1c2e-1111-2222-3333-444455556666"), _data.Account.Rows[0].MapTo<Account>().Key);
         }
 
         [Fact]
         public void MapsTimeSpanFromString()
         {
-            var account = BuildTable().Rows[0].MapTo<Account>();
-            Assert.Equal(TimeSpan.Parse("01:23:45"), account.Duration);
+            Assert.Equal(TimeSpan.Parse("01:23:45"), _data.Account.Rows[0].MapTo<Account>().Duration);
         }
 
         [Fact]
         public void NormalizedNamesMatchSnakeCaseColumns()
         {
-            var table = new DataTable();
-            table.Columns.Add("first_name", typeof(string));
-            table.Columns.Add("RewardsPoints", typeof(decimal));
-            table.Rows.Add("John", 23.3m);
-
-            var poco = table.Rows[0].MapTo<Customer>(new MapOptions { MatchNormalizedNames = true });
+            var poco = _data.SnakeCaseRecord.Rows[0].MapTo<Customer>(new MapOptions { MatchNormalizedNames = true });
             Assert.Equal("John", poco.FirstName);
             Assert.Equal(23.3m, poco.RewardsPoints);
         }
 
         [Fact]
+        public void NormalizedNamesAreOffByDefault()
+        {
+            var poco = _data.SnakeCaseRecord.Rows[0].MapTo<Customer>();
+            Assert.Equal(string.Empty, poco.FirstName);
+            Assert.Null(poco.RewardsPoints);
+        }
+
+        [Fact]
         public void CustomConverterIsUsed()
         {
-            var table = new DataTable();
-            table.Columns.Add("FirstName", typeof(string));
-            table.Rows.Add("shout");
-
             var options = new MapOptions
             {
-                Converter = (value, targetType) => targetType == typeof(string) ? value.ToString().ToUpper() : null
+                Converter = (value, targetType) => targetType == typeof(string) ? value.ToString().Trim().ToUpper() : null
             };
 
-            var poco = table.Rows[0].MapTo<Customer>(options);
-            Assert.Equal("SHOUT", poco.FirstName);
+            // Row 8 is the row with padded text.
+            var poco = _data.Row(_data.Customer, 8).MapTo<StringOnlyPoco>(options);
+            Assert.Equal("PADDED", poco.FirstName);
+            Assert.Equal(string.Empty, poco.LastName);
         }
 
         [Fact]
         public void ConvertToUsesInvariantCultureByDefault()
         {
-            var table = new DataTable();
-            table.Columns.Add("Amount", typeof(string));
-            table.Rows.Add("1.5");
-
-            // Invariant culture always reads "1.5" as one and a half.
-            Assert.Equal(1.5m, table.Rows[0].ConvertTo<decimal>("Amount"));
+            // Row 7 holds "1.5" as text.
+            Assert.Equal(1.5m, _data.Row(_data.Customer, 7).ConvertTo<decimal>("AmountText"));
 
             // A German culture reads the same text as 15 because '.' is its group separator,
             // which is why the default is no longer CultureInfo.CurrentCulture.
             var german = new MapOptions { Culture = CultureInfo.GetCultureInfo("de-DE") };
-            Assert.Equal(15m, table.Rows[0].ConvertTo<decimal>(german, "Amount"));
+            Assert.Equal(15m, _data.Row(_data.Customer, 7).ConvertTo<decimal>(german, "AmountText"));
         }
 
         [Fact]
@@ -127,21 +116,13 @@ namespace DataMapper.Extensions.Tests
         [Fact]
         public void ConvertToSupportsEnums()
         {
-            var table = new DataTable();
-            table.Columns.Add("Status", typeof(string));
-            table.Rows.Add("Inactive");
-
-            Assert.Equal(Status.Inactive, table.Rows[0].ConvertTo<Status>("Status"));
+            Assert.Equal(Status.Inactive, _data.Row(_data.Customer, 7).ConvertTo<Status>("Status"));
         }
 
         [Fact]
         public void ConvertToSupportsGuid()
         {
-            var table = new DataTable();
-            table.Columns.Add("Key", typeof(string));
-            table.Rows.Add("8a0f1c2e-1111-2222-3333-444455556666");
-
-            Assert.Equal(new Guid("8a0f1c2e-1111-2222-3333-444455556666"), table.Rows[0].ConvertTo<Guid>("Key"));
+            Assert.Equal(new Guid("8a0f1c2e-1111-2222-3333-444455556666"), _data.Row(_data.Customer, 1).ConvertTo<Guid>("CustomerKey"));
         }
     }
 }

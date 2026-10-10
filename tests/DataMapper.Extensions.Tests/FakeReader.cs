@@ -18,7 +18,7 @@ namespace DataMapper.Extensions.Tests
 
         public int FieldCount => _fields.Length;
         public string GetName(int i) => _fields[i].Name;
-        public int GetOrdinal(string name) => Array.FindIndex(_fields, f => f.Name == name);
+        public int GetOrdinal(string name) => Array.FindIndex(_fields, f => string.Equals(f.Name, name, StringComparison.OrdinalIgnoreCase));
         public object GetValue(int i) => _fields[i].Value;
         public bool IsDBNull(int i) => _fields[i].Value == null || _fields[i].Value == DBNull.Value;
 

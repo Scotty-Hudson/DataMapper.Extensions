@@ -245,6 +245,9 @@ namespace DataMapper.Extensions
             // DBNull becomes null for a nullable target type. For a non-nullable target this
             // falls through to Convert.ChangeType, which is what produced the original
             // behaviour (DBNull to string gives an empty string).
+            //
+            // Note that ConvertTo does not apply NullHandling: that is a mapping policy, and
+            // ConvertTo has no POCO to apply it to. Use the defaultValue overload for a fallback.
             if (value is DBNull && Nullable.GetUnderlyingType(targetType) != null) return null;
 
             if (targetType.IsInstanceOfType(value)) return value;
