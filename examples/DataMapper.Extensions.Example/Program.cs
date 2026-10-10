@@ -108,8 +108,8 @@ namespace DataMapper.Extensions.Example
                 command.ExecuteNonQuery();
             }
 
-            stopwatch.Stop();
             transaction.Commit();
+            stopwatch.Stop();
 
             Console.WriteLine($"Inserted {Rows} rows in {stopwatch.Elapsed.TotalMilliseconds:F1} ms, commit included.");
         }

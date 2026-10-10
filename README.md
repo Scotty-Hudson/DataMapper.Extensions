@@ -230,7 +230,7 @@ Parameters built from the model:
   duration = 00:01:00 (String)
   created_on = 1/1/2026 12:01:00 AM (String)
   is_active = False (Boolean)
-Inserted 1000 rows in 35.1 ms.
+Inserted 1000 rows in 35.7 ms, commit included.
 
 Parameters bound for the query:
   status = 0 (Int32)

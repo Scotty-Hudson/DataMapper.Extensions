@@ -62,7 +62,7 @@ namespace DataMapper.Extensions
         {
             if (command == null) throw new ArgumentNullException(nameof(command));
 
-            return AddParameter(command, name, value, value?.GetType() ?? typeof(object), options);
+            return AddResolvedParameter(command, name, value, value?.GetType() ?? typeof(object), options);
         }
 
         /// <summary>
@@ -88,7 +88,7 @@ namespace DataMapper.Extensions
             if (parameters is IDictionary<string, object> generic)
             {
                 foreach (var pair in generic)
-                    AddParameter(command, pair.Key, pair.Value, pair.Value?.GetType() ?? typeof(object), options);
+                    AddResolvedParameter(command, pair.Key, pair.Value, pair.Value?.GetType() ?? typeof(object), options);
 
                 return generic.Count;
             }
@@ -96,7 +96,7 @@ namespace DataMapper.Extensions
             if (parameters is IDictionary any)
             {
                 foreach (DictionaryEntry entry in any)
-                    AddParameter(command, entry.Key?.ToString(), entry.Value, entry.Value?.GetType() ?? typeof(object), options);
+                    AddResolvedParameter(command, entry.Key?.ToString(), entry.Value, entry.Value?.GetType() ?? typeof(object), options);
 
                 return any.Count;
             }
@@ -109,18 +109,21 @@ namespace DataMapper.Extensions
                 // Parameters are read out of the object, so read-only members count. This is the
                 // one place where the mapper's "skip members that cannot be written" rule does not
                 // apply: an anonymous type, which is what people pass here, is entirely read-only.
-                AddParameter(command, member.SourceName, member.Get(parameters), member.Type, options);
+                AddResolvedParameter(command, member.SourceName, member.Get(parameters), member.Type, options);
                 count++;
             }
 
             return count;
         }
 
-        private static DbParameter AddParameter(DbCommand command, string name, object value, Type declaredType, MapOptions options)
+        // Named to keep it distinct from the public AddParameter, whose value and name arguments
+        // are in the opposite order.
+        private static DbParameter AddResolvedParameter(DbCommand command, string name, object value, Type declaredType, MapOptions options)
         {
             var parameter = command.CreateParameter();
 
-            // A dictionary key that is not a string, or a null key, can arrive here as null.
+            // Only a null dictionary key arrives here as null. Every standard dictionary rejects a
+            // null key, so this is defensive: it covers a custom IDictionary implementation.
             parameter.ParameterName = name ?? string.Empty;
 
             var resolved = ResolveValue(value, declaredType, options);
