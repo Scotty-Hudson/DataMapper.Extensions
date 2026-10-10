@@ -1,7 +1,8 @@
 # DataMapper.Extensions
 
 Extension methods that map `IDataReader`, `DataTable` and `DataRow` rows onto POCOs and records,
-and POCOs and records back into a `DataTable` or `DbDataReader`.
+map POCOs and records back into a `DataTable` or `DbDataReader`, and bind parameters from an object
+onto a `DbCommand`.
 
 Modern .NET only: `net8.0`, `net9.0` and `net10.0`. No package dependencies.
 
@@ -164,6 +165,38 @@ using (var bulkCopy = new SqlBulkCopy(connection))
 Column names come from the member names or from a `[Column]` attribute, nullable members produce
 columns of the underlying type, and members marked with `[IgnoreMember]` are left out.
 
+## Parameters
+
+`AddParameters` fills a `DbCommand` from an object, an anonymous type or a dictionary. Names come
+from the member names or from a `[Column]` attribute, which is the same rule the mapper uses, and
+`[IgnoreMember]` members are left out.
+
+```c#
+using var connection = new SqlConnection(connectionString);
+using var command = connection.CreateCommand();
+command.CommandText = "select * from accounts where account_id = @account_id and status = @status";
+command.AddParameters(new { account_id = id, status = Status.Active });
+```
+
+A null value becomes `DBNull.Value`. Enums are boxed as their underlying value, because that is
+what a provider can store. `DbType` is set for the types a provider can be told about; `DateTime`
+and `TimeSpan` are left at `DbType.Object` so the provider infers them from the value.
+
+Read-only members are included here. This is the one place where the mapper's rule of skipping
+members with no setter does not apply, and it matters: an anonymous type is entirely read-only, so
+the usual parameter object would produce nothing under the mapping rule.
+
+```c#
+command.AddParameters(new Dictionary<string, object> { ["id"] = 42 });  // keys become parameter names
+var parameter = command.AddParameter(42, "id");                        // one at a time
+```
+
+Only `MapOptions.Converter` is used by the parameter methods. `NullHandling` is a mapping policy,
+and a parameter has no POCO to apply it to, so null is always `DBNull.Value`.
+
+This is the parameter half of a query layer only. Nothing here executes a command: the command
+text, the connection lifetime and transactions remain the caller's job.
+
 ## ConvertTo
 
 ```c#
@@ -206,7 +239,7 @@ dotnet test
 dotnet test -- --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml
 ```
 
-113 tests, using xUnit.net v3 with the Microsoft.Testing.Platform runner. `TestData` is a class
+135 tests, using xUnit.net v3 with the Microsoft.Testing.Platform runner. `TestData` is a class
 fixture, so each test class reads its own copy of `TestData.xml`.
 
 The test data (`TestData.xml`) holds one table per scenario: a fully populated row with
@@ -216,10 +249,10 @@ and a table of deliberately bad values for the failure paths.
 
 The tests cover every data type, the three null policies, member shapes (properties, fields,
 read-only and write-only members, types without a parameterless constructor, records), the
-`DataRow`, `DataTable` and `IDataReader` paths, streaming, async cancellation, and the reverse
-direction.
+`DataRow`, `DataTable` and `IDataReader` paths, streaming, async cancellation, the reverse
+direction, and parameter binding against a minimal `DbCommand` fake.
 
-Coverage of the library is **100% of lines** and **96% of branches**. The branches that
+Coverage of the library is **100% of lines** and **97% of branches**. The branches that
 remain are defensive ones that cannot be reached from a public call: a public property
 with neither a getter nor a setter, `New<T>` for a value type (the generic methods are
 constrained to reference types), and the unreachable default case of the null-policy

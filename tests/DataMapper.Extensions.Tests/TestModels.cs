@@ -71,6 +71,22 @@ namespace DataMapper.Extensions.Tests
         public string Name { get; set; }
     }
 
+    /// <summary>
+    /// Every member is read-only, which is what an anonymous type looks like. The mapper skips
+    /// these members, but the parameter builder reads them.
+    /// </summary>
+    public class ReadOnlyParameterSource
+    {
+        public ReadOnlyParameterSource(long id, string name)
+        {
+            Id = id;
+            Name = name;
+        }
+
+        public long Id { get; }
+        public string Name { get; }
+    }
+
     /// <summary>A POCO with nothing to map.</summary>
     public class NoMemberPoco
     {
