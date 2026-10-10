@@ -31,6 +31,8 @@ namespace DataMapper.Extensions.Example
 
     public static class Program
     {
+        private const int Rows = 1000;
+
         public static void Main()
         {
             using var connection = new SqliteConnection("Data Source=:memory:");
@@ -52,39 +54,30 @@ namespace DataMapper.Extensions.Example
             InsertRows(connection);
             ReadRows(connection);
             NullPolicy(connection);
+            DefaultPoco(connection);
         }
 
         private static void InsertRows(SqliteConnection connection)
         {
-            var accounts = new[]
+            // Every tenth row has no display name and every seventh has no balance, so the null
+            // policy has something to resolve when the rows are read back.
+            var accounts = Enumerable.Range(1, Rows).Select(i => new Account
             {
-                new Account
-                {
-                    Id = 1,
-                    DisplayName = "Scot",
-                    Status = Status.Active,
-                    Key = Guid.NewGuid(),
-                    Balance = 120,
-                    Duration = TimeSpan.FromMinutes(90),
-                    CreatedOn = new DateTime(2026, 1, 15, 9, 30, 0, DateTimeKind.Utc),
-                    IsActive = true,
-                    InternalNote = "never a column"
-                },
-                new Account
-                {
-                    Id = 2,
-                    DisplayName = "Hudson",
-                    Status = Status.Inactive,
-                    Key = Guid.NewGuid(),
-                    Balance = null,
-                    Duration = TimeSpan.FromMinutes(15),
-                    CreatedOn = new DateTime(2026, 3, 2, 11, 5, 0, DateTimeKind.Utc),
-                    IsActive = false,
-                    InternalNote = "never a column"
-                }
-            };
+                Id = i,
+                DisplayName = i % 10 == 0 ? null : $"account-{i}",
+                Status = (Status)(i % 3),
+                Key = new Guid($"00000000-0000-0000-0000-{i:D12}"),
+                Balance = i % 7 == 0 ? null : i * 10,
+                Duration = TimeSpan.FromMinutes(i),
+                CreatedOn = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddMinutes(i),
+                IsActive = i % 2 == 0,
+                InternalNote = "never a column"
+            });
+
+            using var transaction = connection.BeginTransaction();
 
             using var command = connection.CreateCommand();
+            command.Transaction = transaction;
             command.CommandText = """
                 insert into account (account_id, display_name, status, account_key, balance,
                                      duration, created_on, is_active)
@@ -92,15 +85,16 @@ namespace DataMapper.Extensions.Example
                         @duration, @created_on, @is_active)
                 """;
 
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
             foreach (var account in accounts)
             {
                 command.Parameters.Clear();
 
                 // Names come from the Column attributes, the enum is bound as its underlying value,
-                // and a null Balance becomes DBNull.Value. DateTime and TimeSpan are left at
-                // DbType.Object by the library, so the String printed for them below is
-                // Microsoft.Data.Sqlite inferring the type from the value, which is how it stores
-                // them in SQLite.
+                // and a null becomes DBNull.Value. DateTime and TimeSpan are left at DbType.Object
+                // by the library, so the String shown below is Microsoft.Data.Sqlite inferring the
+                // type from the value, which is how it stores them in SQLite.
                 command.AddParameters(account);
 
                 if (account.Id == 1)
@@ -114,7 +108,10 @@ namespace DataMapper.Extensions.Example
                 command.ExecuteNonQuery();
             }
 
-            Console.WriteLine($"Inserted {accounts.Length} rows.");
+            stopwatch.Stop();
+            transaction.Commit();
+
+            Console.WriteLine($"Inserted {Rows} rows in {stopwatch.Elapsed.TotalMilliseconds:F1} ms.");
         }
 
         private static void ReadRows(SqliteConnection connection)
@@ -136,36 +133,85 @@ namespace DataMapper.Extensions.Example
             var options = new MapOptions { MatchNormalizedNames = true };
 
             Console.WriteLine();
-            Console.WriteLine("Mapped rows:");
-            using var reader = command.ExecuteReader();
-            foreach (var account in reader.EnumerateTo<Account>(options))
-                Console.WriteLine($"  {account.Id} {account.DisplayName} {account.Status} " +
-                                  $"{account.Key} {account.Balance} {account.Duration} " +
-                                  $"{account.CreatedOn:O} {account.IsActive}");
+            Console.WriteLine("First five rows, streamed with EnumerateTo:");
+
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            int count = 0;
+            long balanceSum = 0;
+
+            using (var reader = command.ExecuteReader())
+                foreach (var account in reader.EnumerateTo<Account>(options))
+                {
+                    count++;
+                    balanceSum += account.Balance ?? 0;
+
+                    if (count <= 5)
+                        Console.WriteLine($"  {account.Id} {account.DisplayName} {account.Status} " +
+                                          $"{account.Key} {account.Balance} {account.Duration} " +
+                                          $"{account.CreatedOn:O} {account.IsActive}");
+                }
+
+            stopwatch.Stop();
+
+            Console.WriteLine($"  {count} rows mapped in {stopwatch.Elapsed.TotalMilliseconds:F1} ms, " +
+                              $"balance sum {balanceSum}");
         }
 
         private static void NullPolicy(SqliteConnection connection)
         {
-            // AddParameters with no parameters object adds nothing, so this is the same helper
-            // used for a plain Execute.
-            Execute(connection,
-                "insert into account (account_id, display_name, status) values (@account_id, @display_name, @status)",
-                new { account_id = 3, display_name = (string)null, status = Status.Suspended });
-
-            Account Map(MapOptions options)
+            // 100 of the rows have no display name, so the policy has something to resolve across
+            // the whole result set rather than on one row.
+            (int Null, int Empty) Count(MapOptions options)
             {
+                int nulls = 0;
+                int empty = 0;
+
                 using var command = connection.CreateCommand();
-                command.CommandText = "select * from account where account_id = @account_id";
-                command.AddParameters(new { account_id = 3 });
+                command.CommandText = "select * from account";
 
                 using var reader = command.ExecuteReader();
-                return reader.EnumerateTo<Account>(options).First();
+                foreach (var account in reader.EnumerateTo<Account>(options))
+                    if (account.DisplayName == null) nulls++;
+                    else if (account.DisplayName.Length == 0) empty++;
+
+                return (nulls, empty);
             }
 
             Console.WriteLine();
-            Console.WriteLine("Null policy on a null display_name:");
-            Console.WriteLine($"  default (EmptyString): {Show(Map(MapOptions.Default).DisplayName)}");
-            Console.WriteLine($"  NullHandling.Null:     {Show(Map(new MapOptions { NullHandling = NullHandling.Null }).DisplayName)}");
+            Console.WriteLine("Null policy across the whole result set:");
+
+            var defaultCounts = Count(MapOptions.Default);
+            var nullCounts = Count(new MapOptions { NullHandling = NullHandling.Null });
+
+            Console.WriteLine($"  default (EmptyString): {defaultCounts.Empty} empty, {defaultCounts.Null} null");
+            Console.WriteLine($"  NullHandling.Null:     {nullCounts.Empty} empty, {nullCounts.Null} null");
+        }
+
+        private static void DefaultPoco(SqliteConnection connection)
+        {
+            // A default POCO is the only way to get a value other than the policy default: the
+            // clone starts from it, and a member that already has a value is left alone.
+            // Rows that are a multiple of both 7 and 10 have neither a display name nor a balance,
+            // so both defaults are visible on the same row.
+            var defaults = new Account { DisplayName = "unknown", Balance = 0 };
+
+            using var command = connection.CreateCommand();
+            command.CommandText = "select * from account where display_name is null and balance is null order by account_id";
+
+            Console.WriteLine();
+            Console.WriteLine("Default POCO on the rows that come back null:");
+
+            using var reader = command.ExecuteReader();
+            foreach (var account in reader.EnumerateTo<Account>(defaults, MapOptions.Default).Take(3))
+                Console.WriteLine($"  {account.Id} {Show(account.DisplayName)} balance {account.Balance}");
+        }
+
+        private static void Execute(SqliteConnection connection, string sql, object parameters = null)
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = sql;
+            command.AddParameters(parameters);
+            command.ExecuteNonQuery();
         }
 
         // A null and an empty string both print as "" in an interpolated string, so the example
@@ -176,13 +222,5 @@ namespace DataMapper.Extensions.Example
             string text => $"\"{text}\"",
             _ => value.ToString()
         };
-
-        private static void Execute(SqliteConnection connection, string sql, object parameters = null)
-        {
-            using var command = connection.CreateCommand();
-            command.CommandText = sql;
-            command.AddParameters(parameters);
-            command.ExecuteNonQuery();
-        }
     }
 }

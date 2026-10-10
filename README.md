@@ -207,30 +207,41 @@ the library itself still has none.
 dotnet run --project examples/DataMapper.Extensions.Example
 ```
 
-It shows the attributes driving both directions, the parameter builder on an anonymous type, and
-the null policy on a value that comes back null:
+It inserts 1,000 rows in one transaction, streams them back with `EnumerateTo`, and shows the null
+policy and the default POCO across the whole result set rather than on a single row. Output from a
+run on the machine this was developed on:
 
 ```
 Parameters built from the model:
   account_id = 1 (Int64)
-  display_name = "Scot" (String)
-  status = 0 (Int32)
-  account_key = 939188a3-ef9c-48e7-aa50-033a610b10f2 (Guid)
-  balance = 120 (Int32)
-  duration = 01:30:00 (String)
-  created_on = 1/15/2026 9:30:00 AM (String)
-  is_active = True (Boolean)
-Inserted 2 rows.
+  display_name = "account-1" (String)
+  status = 1 (Int32)
+  account_key = 00000000-0000-0000-0000-000000000001 (Guid)
+  balance = 10 (Int32)
+  duration = 00:01:00 (String)
+  created_on = 1/1/2026 12:01:00 AM (String)
+  is_active = False (Boolean)
+Inserted 1000 rows in 35.1 ms.
 
 Parameters bound for the query:
   status = 0 (Int32)
 
-Mapped rows:
-  1 Scot Active 939188a3-ef9c-48e7-aa50-033a610b10f2 120 01:30:00 2026-01-15T09:30:00.0000000 True
+First five rows, streamed with EnumerateTo:
+  3 account-3 Active 00000000-0000-0000-0000-000000000003 30 00:03:00 2026-01-01T00:03:00.0000000 False
+  6 account-6 Active 00000000-0000-0000-0000-000000000006 60 00:06:00 2026-01-01T00:06:00.0000000 True
+  9 account-9 Active 00000000-0000-0000-0000-000000000009 90 00:09:00 2026-01-01T00:09:00.0000000 False
+  12 account-12 Active 00000000-0000-0000-0000-000000000012 120 00:12:00 2026-01-01T00:12:00.0000000 True
+  15 account-15 Active 00000000-0000-0000-0000-000000000015 150 00:15:00 2026-01-01T00:15:00.0000000 False
+  333 rows mapped in 14.7 ms, balance sum 1431450
 
-Null policy on a null display_name:
-  default (EmptyString): ""
-  NullHandling.Null:     null
+Null policy across the whole result set:
+  default (EmptyString): 100 empty, 0 null
+  NullHandling.Null:     0 empty, 100 null
+
+Default POCO on the rows that come back null:
+  70 "unknown" balance 0
+  140 "unknown" balance 0
+  210 "unknown" balance 0
 ```
 
 The `String` shown for `duration` and `created_on` is Microsoft.Data.Sqlite inferring the type from
