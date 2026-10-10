@@ -1,7 +1,7 @@
 # DataMapper.Extensions
 
-Extension methods that map `IDataReader`, `DataTable` and `DataRow` rows onto POCOs, and POCOs
-back into a `DataTable` or `DbDataReader`.
+Extension methods that map `IDataReader`, `DataTable` and `DataRow` rows onto POCOs and records,
+and POCOs and records back into a `DataTable` or `DbDataReader`.
 
 Modern .NET only: `net8.0`, `net9.0` and `net10.0`. No package dependencies.
 
@@ -25,6 +25,9 @@ Pass a POCO to declare defaults for columns that come back as `DBNull`:
 ```c#
 var customers = reader.MapTo(new Customer { Zip = -1 });
 ```
+
+Instances come from a compiled constructor lambda. A type without a parameterless constructor is
+created uninitialized, so its field initializers do not run. Positional records are in that group.
 
 ## Column names and attributes
 
@@ -68,9 +71,9 @@ Three things to know:
   record such as `public record Person { public long Id { get; } }` keeps its defaults. Mapping
   through the constructor is not supported. Read-only members are also not in the member map, so
   the null policy does not apply to them and a read-only string is not guaranteed non-null.
-- **Field initializers do not run on positional records.** A positional record has no
-  parameterless constructor, so `New<T>` creates an uninitialized object. A record with a
-  parameterless constructor runs its initializers as normal.
+- **Field initializers do not run on positional records.** They have no parameterless
+  constructor, so the general rule in the Mapping section applies. A record with a parameterless
+  constructor runs its initializers as normal.
 - **Record structs are not supported**, because the generic methods are constrained to `where T : class`.
 
 ## Null handling
@@ -95,7 +98,11 @@ nullable disabled is treated as non-nullable throughout.
 
 Three settings: `EmptyString` (default), `Keep` (leave whatever the POCO has), and `Null`
 (force null). Only strings can be turned into an empty string; other reference types keep the
-value the POCO already has.
+value the POCO already has. `Null` is ignored for a plain value type, because there is no null to
+assign to one.
+
+The policy applies to members the mapper can write. A member with no setter is not in the member
+map at all, so the guarantee does not hold for a read-only string.
 
 ## Options
 
@@ -206,6 +213,11 @@ The test data (`TestData.xml`) holds one table per scenario: a fully populated r
 every data type the mapper can produce, a sparse row, empty strings, boundary values,
 columns that are not members of the POCO, database-style column names, snake_case names,
 and a table of deliberately bad values for the failure paths.
+
+The tests cover every data type, the three null policies, member shapes (properties, fields,
+read-only and write-only members, types without a parameterless constructor, records), the
+`DataRow`, `DataTable` and `IDataReader` paths, streaming, async cancellation, and the reverse
+direction.
 
 Coverage of the library is **100% of lines** and **96% of branches**. The branches that
 remain are defensive ones that cannot be reached from a public call: a public property
