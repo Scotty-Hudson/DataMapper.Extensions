@@ -6,28 +6,6 @@ using DataMapper.Extensions;
 
 namespace DataMapper.Extensions.Tests
 {
-    public enum Status { Active, Inactive }
-
-    public class Account
-    {
-        [Column("account_id")]
-        public long Id { get; set; }
-
-        [Column("display_name")]
-        public string DisplayName { get; set; }
-
-        [DataMapper.Extensions.IgnoreMember]
-        public string Secret { get; set; }
-
-        public Status Status { get; set; }
-        public Guid Key { get; set; }
-        public int? Balance { get; set; }
-        public TimeSpan Duration { get; set; }
-
-        // Public fields are mapped as well as properties.
-        public string Note;
-    }
-
     public class MappingTests
     {
         private static DataTable BuildTable()

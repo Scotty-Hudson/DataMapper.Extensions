@@ -157,6 +157,20 @@ reflection + `Convert.ChangeType` baseline of **30 ms**.
 
 ```bash
 dotnet test
+
+# with coverage
+dotnet test -- --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml
 ```
 
-53 tests, using xUnit.net v3 with the Microsoft.Testing.Platform runner.
+112 tests, using xUnit.net v3 with the Microsoft.Testing.Platform runner.
+
+The test data (`TestData.xml`) holds one table per scenario: a fully populated row with
+every data type the mapper can produce, a sparse row, empty strings, boundary values,
+columns that are not members of the POCO, database-style column names, snake_case names,
+and a table of deliberately bad values for the failure paths.
+
+Coverage of the library is **100% of lines** and **96% of branches**. The branches that
+remain are defensive ones that cannot be reached from a public call: a public property
+with neither a getter nor a setter, `New<T>` for a value type (the generic methods are
+constrained to reference types), and the unreachable default case of the null-policy
+switch.

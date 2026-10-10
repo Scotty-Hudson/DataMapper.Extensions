@@ -4,6 +4,8 @@
     <xs:element name="NewDataSet" msdata:IsDataSet="true" msdata:MainDataTable="Customer" msdata:UseCurrentLocale="true">
       <xs:complexType>
         <xs:choice minOccurs="0" maxOccurs="unbounded">
+          <!-- Main table: every data type the mapper can produce, plus columns that are
+               deliberately not in the POCO. -->
           <xs:element name="Customer">
             <xs:complexType>
               <xs:sequence>
@@ -18,6 +20,63 @@
                 <xs:element name="ZIP" type="xs:int" minOccurs="0" />
                 <xs:element name="RewardsPoints" type="xs:decimal" minOccurs="0" />
                 <xs:element name="ExtraField" type="xs:decimal" minOccurs="0" />
+                <xs:element name="Status" type="xs:string" minOccurs="0" />
+                <xs:element name="CustomerKey" type="xs:string" minOccurs="0" />
+                <xs:element name="Duration" type="xs:string" minOccurs="0" />
+                <xs:element name="DateOfBirth" type="xs:dateTime" minOccurs="0" />
+                <xs:element name="IsActive" type="xs:boolean" minOccurs="0" />
+                <xs:element name="Score" type="xs:double" minOccurs="0" />
+                <xs:element name="TinyValue" type="xs:short" minOccurs="0" />
+                <xs:element name="ByteValue" type="xs:unsignedByte" minOccurs="0" />
+                <xs:element name="FloatValue" type="xs:float" minOccurs="0" />
+                <xs:element name="AmountText" type="xs:string" minOccurs="0" />
+                <xs:element name="FlagText" type="xs:string" minOccurs="0" />
+                <xs:element name="Notes" type="xs:string" minOccurs="0" />
+              </xs:sequence>
+            </xs:complexType>
+          </xs:element>
+
+          <!-- Deliberately bad values, kept in their own table so the other tests can
+               read every Customer row without hitting a conversion failure. -->
+          <xs:element name="BadData">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="Id" type="xs:long" minOccurs="0" />
+                <xs:element name="Status" type="xs:string" minOccurs="0" />
+                <xs:element name="CustomerKey" type="xs:string" minOccurs="0" />
+                <xs:element name="Duration" type="xs:string" minOccurs="0" />
+              </xs:sequence>
+            </xs:complexType>
+          </xs:element>
+
+          <!-- Columns named like a database, mapped through ColumnAttribute. -->
+          <xs:element name="Account">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="account_id" type="xs:long" minOccurs="0" />
+                <xs:element name="display_name" type="xs:string" minOccurs="0" />
+                <xs:element name="Secret" type="xs:string" minOccurs="0" />
+                <xs:element name="Note" type="xs:string" minOccurs="0" />
+              </xs:sequence>
+            </xs:complexType>
+          </xs:element>
+
+          <!-- Columns matched by MatchNormalizedNames. -->
+          <xs:element name="SnakeCaseRecord">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="first_name" type="xs:string" minOccurs="0" />
+                <xs:element name="rewards_points" type="xs:decimal" minOccurs="0" />
+              </xs:sequence>
+            </xs:complexType>
+          </xs:element>
+
+          <!-- A table whose columns match public fields rather than properties. -->
+          <xs:element name="FieldOnlyRecord">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="Id" type="xs:long" minOccurs="0" />
+                <xs:element name="Name" type="xs:string" minOccurs="0" />
               </xs:sequence>
             </xs:complexType>
           </xs:element>
@@ -25,6 +84,8 @@
       </xs:complexType>
     </xs:element>
   </xs:schema>
+
+  <!-- 1. Every column populated with normal values. -->
   <Customer>
     <Id>1</Id>
     <FirstName>John</FirstName>
@@ -34,12 +95,25 @@
     <Address>312 Brackish Rd</Address>
     <City>Boston</City>
     <State>MA</State>
-    <ZIP>34567</ZIP> <!-- Made this field uppercase to test case insensitivity for mappings -->
+    <ZIP>34567</ZIP> <!-- Uppercase to test case insensitive mapping -->
     <RewardsPoints>23.3</RewardsPoints>
     <ExtraField>3.9</ExtraField>
+    <Status>Active</Status>
+    <CustomerKey>8a0f1c2e-1111-2222-3333-444455556666</CustomerKey>
+    <Duration>01:23:45</Duration>
+    <DateOfBirth>1980-03-15T00:00:00Z</DateOfBirth>
+    <IsActive>true</IsActive>
+    <Score>98.6</Score>
+    <TinyValue>7</TinyValue>
+    <ByteValue>200</ByteValue>
+    <FloatValue>1.5</FloatValue>
+    <AmountText>1.5</AmountText>
+    <FlagText>true</FlagText>
+    <Notes>a note</Notes>
   </Customer>
+
+  <!-- 2. Sparse row: most columns missing, so defaults and the null-string rule apply. -->
   <Customer>
-    <!--This record is missing PhoneNumber, Zip, and RewardsPoints for test purposes-->
     <Id>2</Id>
     <FirstName>Jake</FirstName>
     <LastName>McPhelson</LastName>
@@ -48,16 +122,98 @@
     <City>Houston</City>
     <State>TX</State>
   </Customer>
+
+  <!-- 3. Empty strings are not the same as missing values. Only columns that map to
+        string members, because an empty enum, Guid or TimeSpan text is a data error. -->
   <Customer>
-    <!--This record is missing PhoneNumber for test purposes-->
     <Id>3</Id>
     <FirstName>Bob</FirstName>
-    <LastName>Jackson</LastName>
-    <Email>Bob123@vixmix.com</Email>
-    <Address>2345 Cumberland St.</Address>
-    <City>Nashville</City>
-    <State>TN</State>
+    <LastName></LastName>
+    <Email></Email>
+    <PhoneNumber></PhoneNumber>
+    <Address></Address>
+    <City></City>
+    <State></State>
     <ZIP>37210</ZIP>
     <RewardsPoints>0</RewardsPoints>
+    <Notes></Notes>
   </Customer>
+
+  <!-- 4. Boundary values. -->
+  <Customer>
+    <Id>4</Id>
+    <FirstName>Boundary</FirstName>
+    <ZIP>2147483647</ZIP>
+    <RewardsPoints>-9999.99</RewardsPoints>
+    <Score>-1.7976931348623157E+308</Score>
+    <TinyValue>-32768</TinyValue>
+    <ByteValue>255</ByteValue>
+    <FloatValue>-3.4028235E+38</FloatValue>
+    <IsActive>false</IsActive>
+    <AmountText>0</AmountText>
+  </Customer>
+
+  <!-- 5. Values that cannot be converted, for the failure paths. -->
+  <BadData>
+    <Id>5</Id>
+    <Status>Unknown</Status>
+    <CustomerKey>not-a-guid</CustomerKey>
+    <Duration>not-a-timespan</Duration>
+  </BadData>
+
+  <!-- 6. Empty text for a type that has no sensible empty value. -->
+  <BadData>
+    <Id>6</Id>
+    <Status></Status>
+    <CustomerKey></CustomerKey>
+    <Duration></Duration>
+  </BadData>
+
+  <!-- 7. Enum stored as a number, and a culture sensitive decimal string. -->
+  <Customer>
+    <Id>7</Id>
+    <FirstName>Culture</FirstName>
+    <Status>1</Status>
+    <AmountText>1.5</AmountText>
+    <FlagText>1</FlagText>
+  </Customer>
+
+  <!-- 8. Whitespace, for a trimming converter. -->
+  <Customer>
+    <Id>8</Id>
+    <FirstName>  padded  </FirstName>
+    <Notes>  </Notes>
+  </Customer>
+
+  <!-- 9. Only the key, everything else missing. -->
+  <Customer>
+    <Id>9</Id>
+  </Customer>
+
+  <Account>
+    <account_id>1</account_id>
+    <display_name>John Doe</display_name>
+    <Secret>should be ignored</Secret>
+    <Note>a note</Note>
+  </Account>
+
+  <Account>
+    <account_id>2</account_id>
+    <!-- display_name, Secret and Note missing -->
+  </Account>
+
+  <SnakeCaseRecord>
+    <first_name>John</first_name>
+    <rewards_points>23.3</rewards_points>
+  </SnakeCaseRecord>
+
+  <FieldOnlyRecord>
+    <Id>1</Id>
+    <Name>Field Person</Name>
+  </FieldOnlyRecord>
+
+  <FieldOnlyRecord>
+    <Id>2</Id>
+    <!-- Name missing -->
+  </FieldOnlyRecord>
 </NewDataSet>

@@ -38,6 +38,9 @@ namespace DataMapper.Extensions
 
             foreach (var property in type.GetProperties(Flags))
             {
+                // Indexers (this[int]) are not members a mapper can name, so they are skipped.
+                if (property.GetIndexParameters().Length > 0) continue;
+
                 var getter = property.GetGetMethod();
                 var setter = property.GetSetMethod();
                 if (getter == null && setter == null) continue;
@@ -238,6 +241,11 @@ namespace DataMapper.Extensions
                 var converted = options.Converter(value, targetType);
                 if (converted != null) return converted;
             }
+
+            // DBNull becomes null for a nullable target type. For a non-nullable target this
+            // falls through to Convert.ChangeType, which is what produced the original
+            // behaviour (DBNull to string gives an empty string).
+            if (value is DBNull && Nullable.GetUnderlyingType(targetType) != null) return null;
 
             if (targetType.IsInstanceOfType(value)) return value;
 

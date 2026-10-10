@@ -20,7 +20,7 @@ namespace DataMapper.Extensions.Tests
             var table = customers.ToDataTable("Customer");
 
             Assert.Equal("Customer", table.TableName);
-            Assert.Equal(10, table.Columns.Count);
+            Assert.Equal(20, table.Columns.Count);
             Assert.Equal(2, table.Rows.Count);
 
             // Nullable members produce columns of the underlying type.
