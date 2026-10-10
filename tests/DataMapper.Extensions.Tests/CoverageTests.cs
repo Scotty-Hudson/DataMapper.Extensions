@@ -82,7 +82,8 @@ namespace DataMapper.Extensions.Tests
 
             using (var reader = table.CreateDataReader())
             {
-                var list = await reader.MapToAsync<NullPolicyPoco>(new MapOptions { NullHandling = NullHandling.Keep });
+                var list = await reader.MapToAsync<NullPolicyPoco>(
+                    new MapOptions { NullHandling = NullHandling.Keep }, TestContext.Current.CancellationToken);
                 Assert.Single(list);
                 Assert.Equal(1L, list[0].Id);
             }

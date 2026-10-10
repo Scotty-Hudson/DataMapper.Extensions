@@ -56,7 +56,7 @@ namespace DataMapper.Extensions.Tests
             using (var reader = BuildTable().CreateDataReader())
             {
                 var streamed = new List<Customer>();
-                await foreach (var customer in reader.EnumerateToAsync<Customer>(new Customer(), MapOptions.Default, CancellationToken.None))
+                await foreach (var customer in reader.EnumerateToAsync<Customer>(new Customer(), MapOptions.Default, TestContext.Current.CancellationToken))
                     streamed.Add(customer);
 
                 Assert.Equal(3, streamed.Count);
@@ -83,7 +83,7 @@ namespace DataMapper.Extensions.Tests
         {
             using (var reader = BuildTable().CreateDataReader())
             {
-                var streamed = await reader.MapToAsync<Customer>(new Customer(), MapOptions.Default, CancellationToken.None);
+                var streamed = await reader.MapToAsync<Customer>(new Customer(), MapOptions.Default, TestContext.Current.CancellationToken);
                 Assert.Equal(3, streamed.Count);
                 Assert.Equal("John", streamed[0].FirstName);
             }
