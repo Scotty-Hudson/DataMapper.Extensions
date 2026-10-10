@@ -106,6 +106,37 @@ namespace DataMapper.Extensions.Tests
         public string LastName { get; set; }
     }
 
+    // ---------- records ----------
+
+    public record PositionalRecord(long Id, string Name);
+
+    public record RecordWithInitializer(long Id, string Name)
+    {
+        public string Tag { get; set; } = "default-tag";
+    }
+
+    public record RecordWithDefaultConstructor
+    {
+        public long Id { get; set; }
+        public string Tag { get; set; } = "default-tag";
+    }
+
+    public record RecordWithAttributes
+    {
+        [Column("account_id")]
+        public long Id { get; init; }
+
+        [IgnoreMember]
+        public string Secret { get; init; }
+    }
+
+    /// <summary>No setter anywhere, so the mapper has nothing it can write.</summary>
+    public record ImmutableRecord
+    {
+        public long Id { get; }
+        public string Name { get; }
+    }
+
     /// <summary>A property with no getter: the mapper can write it but never read it back.</summary>
     public class WriteOnlyPoco
     {

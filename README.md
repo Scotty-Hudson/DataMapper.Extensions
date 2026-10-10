@@ -51,6 +51,28 @@ public class Account
 `MatchNormalizedNames` also matches ignoring case, underscores and spaces, so a column named
 `first_name` maps to `FirstName`.
 
+## Records
+
+Records map the same way classes do, including positional records, `init` accessors, attributes,
+the reader path and `ToDataTable`:
+
+```c#
+public record Person(long Id, string Name);
+
+var people = reader.MapTo<Person>();
+```
+
+Three things to know:
+
+- **Get-only members are skipped.** A member with no setter cannot be written, so an immutable
+  record such as `public record Person { public long Id { get; } }` keeps its defaults. Mapping
+  through the constructor is not supported. Read-only members are also not in the member map, so
+  the null policy does not apply to them and a read-only string is not guaranteed non-null.
+- **Field initializers do not run on positional records.** A positional record has no
+  parameterless constructor, so `New<T>` creates an uninitialized object. A record with a
+  parameterless constructor runs its initializers as normal.
+- **Record structs are not supported**, because the generic methods are constrained to `where T : class`.
+
 ## Null handling
 
 Nulls enter the code base at one place, the data source, so that is where they are resolved. The
@@ -177,7 +199,7 @@ dotnet test
 dotnet test -- --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml
 ```
 
-104 tests, using xUnit.net v3 with the Microsoft.Testing.Platform runner. `TestData` is a class
+113 tests, using xUnit.net v3 with the Microsoft.Testing.Platform runner. `TestData` is a class
 fixture, so each test class reads its own copy of `TestData.xml`.
 
 The test data (`TestData.xml`) holds one table per scenario: a fully populated row with
