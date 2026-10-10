@@ -325,10 +325,14 @@ namespace DataMapper.Extensions
             return map;
         }
 
-        private static T MapRow<T>(DataRow row, T poco, IReadOnlyList<ColumnEntry> map, MapOptions options) where T : class
+        // List rather than IReadOnlyList: foreach over IReadOnlyList goes through IEnumerable and
+        // allocates a boxed enumerator for every row.
+        private static T MapRow<T>(DataRow row, T poco, List<ColumnEntry> map, MapOptions options) where T : class
         {
-            foreach (var entry in map)
+            for (var i = 0; i < map.Count; i++)
             {
+                var entry = map[i];
+
                 if (entry.Column == null)
                 {
                     // No column for this member: keep the POCO value, but still apply the
@@ -381,10 +385,12 @@ namespace DataMapper.Extensions
             return map;
         }
 
-        private static T MapRecord<T>(IDataRecord record, T poco, IReadOnlyList<FieldEntry> map, MapOptions options) where T : class
+        private static T MapRecord<T>(IDataRecord record, T poco, List<FieldEntry> map, MapOptions options) where T : class
         {
-            foreach (var entry in map)
+            for (var i = 0; i < map.Count; i++)
             {
+                var entry = map[i];
+
                 if (entry.Ordinal < 0)
                 {
                     ApplyNullPolicy(entry.Member, poco, options);
