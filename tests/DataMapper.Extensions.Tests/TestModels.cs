@@ -87,6 +87,13 @@ namespace DataMapper.Extensions.Tests
         public string Name { get; }
     }
 
+    /// <summary>Two members that resolve to the same column name.</summary>
+    public class DuplicateColumnPoco
+    {
+        [Column("same_name")] public string A { get; set; }
+        [Column("same_name")] public string B { get; set; }
+    }
+
     /// <summary>A POCO with nothing to map.</summary>
     public class NoMemberPoco
     {

@@ -122,8 +122,9 @@ var amount = row.ConvertTo<decimal>(options, "Amount");
 ```
 
 Values are converted with `Convert.ChangeType`, except for cases it cannot handle and that the
-extensions support: nullable target types, enums, `Guid` and `TimeSpan` from strings. A value that
-is already the target type is assigned without converting.
+extensions support: nullable target types, enums, `Guid`, `TimeSpan`, `DateOnly` and `TimeOnly` from
+strings, and `DateTime` to `DateOnly` or `TimeOnly`. A value that is already the target type is
+assigned without converting. Passing `null` for the options uses the default.
 
 `CultureInfo.InvariantCulture` is the default. The original version used `CurrentCulture`, which
 can silently corrupt numeric data: a column value of `"1.5"` becomes `15` under a German culture.
@@ -199,9 +200,13 @@ member type, so the two always agree.
 Dictionaries are read as name and value pairs, not as a POCO. `Dictionary<string, int>` binds its
 entries, not its properties, and a key that is not a string becomes a name through `ToString()`.
 
-Two members with the same name, or the same `[Column]` name, produce two parameters with the same
-name. Providers reject duplicate parameter names, so that is a model error the library does not try
-to repair.
+Two members that resolve to the same name are a model error the library does not try to repair:
+parameter providers reject duplicate parameter names, and `ToDataTable` throws
+`DuplicateNameException` because a `DataTable` cannot hold two columns with the same name.
+
+When a reader has two fields with the same name, or two names that normalize to the same value with
+`MatchNormalizedNames`, the last one wins. That rule is the same for the `DataTable` and the reader
+paths.
 
 This is the parameter half of a query layer only. Nothing here executes a command: the command
 text, the connection lifetime and transactions remain the caller's job.
@@ -271,6 +276,9 @@ var amount = row.ConvertTo<decimal>(options, "Amount");
 always has, which for a string is an empty string. `NullHandling` is a mapping policy and does not
 apply to `ConvertTo`; use the `defaultValue` overload for a fallback.
 
+`object` is not a nullable target type in the reflection sense, so `ConvertTo<object>` on a `DBNull`
+column returns `DBNull.Value` rather than `null`.
+
 ## Changes from the original
 
 - `CultureInfo.InvariantCulture` is the default culture, because `CurrentCulture` can silently
@@ -301,7 +309,7 @@ dotnet test
 dotnet test -- --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml
 ```
 
-141 tests, using xUnit.net v3 with the Microsoft.Testing.Platform runner. `TestData` is a class
+150 tests, using xUnit.net v3 with the Microsoft.Testing.Platform runner. `TestData` is a class
 fixture, so each test class reads its own copy of `TestData.xml`.
 
 The test data (`TestData.xml`) holds one table per scenario: a fully populated row with
@@ -312,11 +320,14 @@ and a table of deliberately bad values for the failure paths.
 The tests cover every data type, the three null policies, member shapes (properties, fields,
 read-only and write-only members, types without a parameterless constructor, records), the
 `DataRow`, `DataTable` and `IDataReader` paths, streaming, async cancellation, the reverse
-direction, and parameter binding against a minimal `DbCommand` fake.
+direction, parameter binding against a minimal `DbCommand` fake, null options, duplicate and
+null names in a reader, and the `DateOnly` and `TimeOnly` conversions.
 
-Coverage of the library is **100% of lines** and **96.7% of branches**. The branches that
+Coverage of the library is **100% of lines** and **97.5% of branches**. The branches that
 remain are defensive ones that cannot be reached from a public call: a public property
 with neither a getter nor a setter, `New<T>` for a value type (the generic methods are
 constrained to reference types), the unreachable default case of the null-policy
 switch, and the null-key guard on the dictionary path, which no standard dictionary can
-trigger because they all reject null keys.
+trigger because they all reject null keys. The last one is the await-continuation check the
+compiler generates for the async state machine; it is only taken when a reader completes
+`ReadAsync` asynchronously, which the in-memory reader in the tests never does.

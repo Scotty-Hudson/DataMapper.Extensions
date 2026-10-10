@@ -231,11 +231,19 @@ namespace DataMapper.Extensions
         }
 
         /// <summary>
-        /// Converts a value to <paramref name="targetType"/>. Handles nullable types,
-        /// enums, Guid and TimeSpan, which Convert.ChangeType alone cannot.
+        /// Converts a value to the target type. Handles nullable types, enums, Guid, TimeSpan,
+        /// DateOnly and TimeOnly, which Convert.ChangeType alone cannot.
         /// </summary>
+        /// <remarks>
+        /// DBNull becomes null only for a target type that is nullable in the reflection sense,
+        /// which does not include <c>object</c>. ConvertTo&lt;object&gt; on a DBNull column returns
+        /// DBNull.Value. Use the defaultValue overload if you want a fallback.
+        /// </remarks>
         private static object ConvertValue(object value, Type targetType, MapOptions options)
         {
+            // Options are optional everywhere in this library, so null means the default.
+            options ??= MapOptions.Default;
+
             if (options.Converter != null)
             {
                 var converted = options.Converter(value, targetType);
@@ -253,7 +261,10 @@ namespace DataMapper.Extensions
             if (targetType.IsInstanceOfType(value)) return value;
 
             var underlyingType = Nullable.GetUnderlyingType(targetType) ?? targetType;
-            if (underlyingType.IsInstanceOfType(value)) return value;
+
+            // No separate instance-of check is needed for the underlying type: a boxed value is
+            // always reported as an instance of Nullable<T> as well as of T, so the check above
+            // already returns it.
 
             if (underlyingType.IsEnum)
                 return value is string enumName
@@ -264,6 +275,17 @@ namespace DataMapper.Extensions
             {
                 if (underlyingType == typeof(Guid)) return Guid.Parse(text);
                 if (underlyingType == typeof(TimeSpan)) return TimeSpan.Parse(text, options.Culture);
+                if (underlyingType == typeof(DateOnly)) return DateOnly.Parse(text, options.Culture);
+                if (underlyingType == typeof(TimeOnly)) return TimeOnly.Parse(text, options.Culture);
+            }
+
+            // DateOnly and TimeOnly are not IConvertible, so Convert.ChangeType cannot bridge to
+            // them. Providers commonly return those columns as DateTime, which is the case this
+            // handles.
+            if (value is DateTime moment)
+            {
+                if (underlyingType == typeof(DateOnly)) return DateOnly.FromDateTime(moment);
+                if (underlyingType == typeof(TimeOnly)) return TimeOnly.FromDateTime(moment);
             }
 
             return Convert.ChangeType(value, underlyingType, options.Culture);
@@ -291,6 +313,10 @@ namespace DataMapper.Extensions
                     return;
 
                 case NullHandling.EmptyString:
+                    // The guarantee needs to read the current value, so it cannot be applied to a
+                    // setter-only member.
+                    if (!member.CanRead) return;
+
                     // A non-nullable string is guaranteed non-null. Other reference types keep the
                     // template value, because there is no empty instance of an arbitrary type.
                     if (member.Type == typeof(string) && !member.IsNullableReference && member.Get(poco) == null)
@@ -303,6 +329,8 @@ namespace DataMapper.Extensions
         // row loop does no name lookups at all.
         private static List<ColumnEntry> BuildColumnMap(MemberAccessor accessor, DataTable table, MapOptions options)
         {
+            options ??= MapOptions.Default;
+
             var map = new List<ColumnEntry>(accessor.GetMembers().Count);
 
             foreach (var member in accessor.GetMembers())
@@ -314,9 +342,10 @@ namespace DataMapper.Extensions
 
                 if (column == null && options.MatchNormalizedNames)
                 {
+                    // Last match wins, which is the rule the reader path uses for duplicate names.
                     var target = Normalize(name);
                     foreach (DataColumn candidate in table.Columns)
-                        if (Normalize(candidate.ColumnName) == target) { column = candidate; break; }
+                        if (Normalize(candidate.ColumnName) == target) column = candidate;
                 }
 
                 map.Add(new ColumnEntry(member, column));
@@ -329,6 +358,8 @@ namespace DataMapper.Extensions
         // allocates a boxed enumerator for every row.
         private static T MapRow<T>(DataRow row, T poco, List<ColumnEntry> map, MapOptions options) where T : class
         {
+            options ??= MapOptions.Default;
+
             for (var i = 0; i < map.Count; i++)
             {
                 var entry = map[i];
@@ -356,6 +387,8 @@ namespace DataMapper.Extensions
 
         private static List<FieldEntry> BuildFieldMap(MemberAccessor accessor, IDataReader reader, MapOptions options)
         {
+            options ??= MapOptions.Default;
+
             // Cache the field names in the reader for use in our while loop for efficiency.
             var readerFieldLookup = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             Dictionary<string, int> normalizedLookup = options.MatchNormalizedNames
@@ -364,7 +397,11 @@ namespace DataMapper.Extensions
 
             for (var i = 0; i < reader.FieldCount; i++)
             {
+                // A custom reader can return null for a field name. There is nothing to match, so
+                // the field is skipped rather than becoming a dictionary key.
                 var name = reader.GetName(i);
+                if (name == null) continue;
+
                 readerFieldLookup[name] = i;
                 if (normalizedLookup != null) normalizedLookup[Normalize(name)] = i;
             }
@@ -387,6 +424,8 @@ namespace DataMapper.Extensions
 
         private static T MapRecord<T>(IDataRecord record, T poco, List<FieldEntry> map, MapOptions options) where T : class
         {
+            options ??= MapOptions.Default;
+
             for (var i = 0; i < map.Count; i++)
             {
                 var entry = map[i];
@@ -414,6 +453,10 @@ namespace DataMapper.Extensions
         /// names or from a ColumnAttribute, and nullable members produce columns of the
         /// underlying type. Useful for SqlBulkCopy and for building test data.
         /// </summary>
+        /// <remarks>
+        /// Two members that resolve to the same column name throw DuplicateNameException,
+        /// because a DataTable cannot hold two columns with the same name.
+        /// </remarks>
         public static DataTable ToDataTable<T>(this IEnumerable<T> source, string tableName = "Table") where T : class
         {
             var accessor = MemberAccessor.Create(typeof(T));

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -125,6 +126,125 @@ namespace DataMapper.Extensions.Tests
             var p = table.Rows[0].MapTo<WriteOnlyPoco>();
             Assert.Equal(1L, p.Id);
             Assert.Equal("written", p.Value);
+        }
+
+        [Fact]
+        public void WriteOnlyMemberSkipsTheNullPolicyBecauseItCannotBeRead()
+        {
+            // ApplyNullPolicy cannot read the current value of a setter-only member, so the
+            // guarantee is skipped. Before the guard this threw NullReferenceException.
+            var table = BuildTable(("Id", typeof(long)), ("OnlySet", typeof(string)));
+            table.Rows.Add(1L, DBNull.Value);
+
+            var p = table.Rows[0].MapTo<WriteOnlyPoco>();
+            Assert.Equal(1L, p.Id);
+
+            // Same for a member with no column at all.
+            var missing = BuildTable(("Id", typeof(long)));
+            missing.Rows.Add(2L);
+            Assert.Equal(2L, missing.Rows[0].MapTo<WriteOnlyPoco>().Id);
+        }
+
+        [Fact]
+        public void NullOptionsUseTheDefault()
+        {
+            var table = BuildTable(("Id", typeof(long)), ("Name", typeof(string)));
+            table.Rows.Add(DBNull.Value, DBNull.Value);
+
+            var p = table.MapTo<StringOnlyPoco>((MapOptions)null)[0];
+            Assert.Equal(string.Empty, p.FirstName);
+
+            Assert.Null(table.Rows[0].ConvertTo<long?>((MapOptions)null, "Id"));
+
+            // A nullable target that has a value. A boxed long is reported as an instance of
+            // Nullable<long>, so the first instance-of check in ConvertValue returns it.
+            table.Rows[0]["Id"] = 1L;
+            Assert.Equal(1L, table.Rows[0].ConvertTo<long?>("Id"));
+
+            // The reader path has its own option handling, so it needs its own check.
+            using (var reader = table.CreateDataReader())
+            {
+                var r = reader.MapTo<StringOnlyPoco>((MapOptions)null)[0];
+                Assert.Equal(string.Empty, r.FirstName);
+            }
+        }
+
+        [Fact]
+        public void ConvertToObjectOnDbNullReturnsDbNullValue()
+        {
+            // object is not a nullable target type in the reflection sense, so the nullable rule
+            // does not apply and the value passes through unchanged.
+            var table = BuildTable(("Id", typeof(long)));
+            table.Rows.Add(DBNull.Value);
+
+            Assert.Equal(DBNull.Value, table.Rows[0].ConvertTo<object>("Id"));
+        }
+
+        [Fact]
+        public void ToDataTableThrowsOnDuplicateColumnNames()
+        {
+            var rows = new[] { new DuplicateColumnPoco { A = "x", B = "y" } };
+            Assert.Throws<DuplicateNameException>(() => rows.ToDataTable());
+        }
+
+        // ---------- DateOnly and TimeOnly ----------
+
+        [Fact]
+        public void DateOnlyAndTimeOnlyFromStrings()
+        {
+            var table = BuildTable(("Day", typeof(string)), ("Time", typeof(string)));
+            table.Rows.Add("2026-01-01", "10:30:00");
+
+            Assert.Equal(new DateOnly(2026, 1, 1), table.Rows[0].ConvertTo<DateOnly>("Day"));
+            Assert.Equal(new TimeOnly(10, 30, 0), table.Rows[0].ConvertTo<TimeOnly>("Time"));
+        }
+
+        [Fact]
+        public void DateOnlyAndTimeOnlyFromDateTime()
+        {
+            // They are not IConvertible, so Convert.ChangeType cannot bridge to them. Providers
+            // commonly return these columns as DateTime.
+            var table = BuildTable(("Moment", typeof(DateTime)));
+            var moment = new DateTime(2026, 1, 1, 10, 30, 0);
+            table.Rows.Add(moment);
+
+            Assert.Equal(new DateOnly(2026, 1, 1), table.Rows[0].ConvertTo<DateOnly>("Moment"));
+            Assert.Equal(new TimeOnly(10, 30, 0), table.Rows[0].ConvertTo<TimeOnly>("Moment"));
+
+            // A DateTime value with a target that is neither of those falls through to
+            // Convert.ChangeType, which is the branch the two assertions above do not reach.
+            Assert.Equal(moment.ToString(CultureInfo.InvariantCulture), table.Rows[0].ConvertTo<string>("Moment"));
+        }
+
+        // ---------- duplicate names ----------
+
+        [Fact]
+        public void ReaderDuplicateNormalizedNamesTakeTheLastOne()
+        {
+            var reader = new FakeReader(("first_name", "first"), ("firstname", "second"));
+            var p = reader.MapTo<StringOnlyPoco>(new MapOptions { MatchNormalizedNames = true })[0];
+
+            Assert.Equal("second", p.FirstName);
+        }
+
+        [Fact]
+        public void DataTableDuplicateNormalizedNamesTakeTheLastOne()
+        {
+            // The DataTable path used to take the first match, which disagreed with the reader.
+            var table = BuildTable(("first_name", typeof(string)), ("firstname", typeof(string)));
+            table.Rows.Add("first", "second");
+
+            var p = table.MapTo<StringOnlyPoco>(new MapOptions { MatchNormalizedNames = true })[0];
+            Assert.Equal("second", p.FirstName);
+        }
+
+        [Fact]
+        public void ReaderWithANullFieldNameIsSkipped()
+        {
+            var reader = new FakeReader((null, "ignored"), ("Name", "kept"));
+            var p = reader.MapTo<FieldOnlyRecord>()[0];
+
+            Assert.Equal("kept", p.Name);
         }
 
         [Fact]
