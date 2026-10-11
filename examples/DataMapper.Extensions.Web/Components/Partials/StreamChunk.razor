@@ -10,7 +10,7 @@
     var next = Chunk.More ? $"/stream/chunk?{prefix}after={Chunk.Next}&chunk={Chunk.ChunkSize}" : null;
 }
 
-<div class="chunk" hx-get="@next" hx-trigger="revealed" hx-swap="afterend">
+<div id="chunk" class="chunk" hx-get="@next" hx-trigger="revealed" hx-swap="afterend">
     <p class="note">@Chunk.Rows.Count rows in @Chunk.ElapsedMs ms@(Chunk.Outcome)</p>
 
     <table class="grid">

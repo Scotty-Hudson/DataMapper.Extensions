@@ -38,10 +38,16 @@ app.MapStaticAssets();
 // htmx is the only client script in the app, and these are the routes it calls: they return a
 // fragment rather than a page. Every htmx element also has a plain action or href, so the pages
 // still work when the script is not running.
+//
+// A swap does not touch the address bar, so these endpoints send HX-Push-Url with the page URL. htmx
+// reads that header by itself, and the server has the parsed filter, so what gets pushed is a URL a
+// refresh or a shared link can load as a whole page.
 app.MapGet("/jobs/results", async (HttpContext context, JobRepository jobs) =>
 {
     var filter = JobFilter.FromQuery(context.Request.Query);
     var result = await jobs.QueryAsync(filter, context.RequestAborted);
+
+    context.Response.Headers["HX-Push-Url"] = $"/jobs?{filter.ToQueryString(result.Page)}";
 
     return new RazorComponentResult<JobResults>(new { Filter = filter, Result = result });
 });
@@ -50,12 +56,23 @@ app.MapGet("/stream/chunk", async (HttpContext context, JobRepository jobs) =>
 {
     var query = context.Request.Query;
 
-    var chunk = Math.Clamp(int.TryParse(query["chunk"], out var size) ? size : ChunkSize, 1, 200);
+    // The chain links send the size as "chunk"; the form sends it as "limit". Accept either.
+    var size = query["chunk"].FirstOrDefault() ?? query["limit"].FirstOrDefault();
+    var chunk = Math.Clamp(int.TryParse(size, out var parsed) ? parsed : ChunkSize, 1, 200);
     var cancelAfter = int.TryParse(query["cancel_after"], out var after) ? after : 0;
     var cursor = int.TryParse(query["after"], out var value) ? value : 0;
 
     var filter = JobFilter.FromQuery(query);
     var result = await jobs.GetChunkAsync(filter, cursor, chunk, cancelAfter > 0 ? cancelAfter : null, context.RequestAborted);
+
+    // Only the run is pushed. The chunks the chain appends would each overwrite the address bar with a
+    // cursor, which is not a URL worth sharing.
+    if (cursor == 0)
+    {
+        var parts = filter.ToFilterQueryString();
+        context.Response.Headers["HX-Push-Url"] = $"/stream?limit={chunk}&cancel_after={cancelAfter}"
+            + (parts.Length > 0 ? $"&{parts}" : string.Empty);
+    }
 
     return new RazorComponentResult<StreamChunk>(new { Chunk = result, FilterQuery = filter.ToFilterQueryString() });
 });

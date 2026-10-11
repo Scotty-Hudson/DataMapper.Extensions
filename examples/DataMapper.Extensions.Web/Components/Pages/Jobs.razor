@@ -25,7 +25,13 @@
     the htmx path saves is the parts of the page that did not change.
 </p>
 
-<form method="get" action="/jobs" hx-get="/jobs/results" hx-target="#results" hx-swap="outerHTML" class="filter fields">
+<p class="note">
+    A swap keeps the page where it was, which a navigation does not. It also leaves the address bar
+    alone, so the endpoint sends <code>HX-Push-Url</code> with the <code>/jobs</code> URL built from the
+    filter it parsed: that is the URL a refresh or a shared link can load as a whole page.
+</p>
+
+<form method="get" action="/jobs" hx-get="/jobs/results" hx-target="#results" hx-swap="outerHTML" hx-push-url="true" class="filter fields">
     <label>
         Customer contains
         <input type="text" name="customer_like" value="@filter.CustomerLike" placeholder="customer-123" />

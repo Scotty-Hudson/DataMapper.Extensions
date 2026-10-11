@@ -24,8 +24,10 @@
     htmx is used where a full page reload would otherwise be the only option: the jobs filter and pager
     swap just the results region, the streaming page appends one chunk at a time as each chunk is
     revealed, and the archive replay swaps the archive region. Those endpoints return a fragment through
-    <code>RazorComponentResult</code>. Where htmx does not fit it is not used: a CSV download cannot be
-    swapped because the response is a file rather than markup, and dark mode is a browser preference
+    <code>RazorComponentResult</code>. A swap does not move the scroll position, which is the difference
+    between htmx and a reload, and the endpoints send <code>HX-Push-Url</code> with the page URL so the
+    address bar still records what was run. Where htmx does not fit it is not used: a CSV download cannot
+    be swapped because the response is a file rather than markup, and dark mode is a browser preference
     rather than something a fragment can change. Every htmx element keeps a plain <code>href</code> or
     form action, so the app still works with the script disabled.
 </p>
