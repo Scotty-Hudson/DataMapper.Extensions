@@ -2,7 +2,6 @@ using System;
 using System.Data;
 using System.Globalization;
 using Xunit;
-using DataMapper.Extensions;
 
 namespace DataMapper.Extensions.Tests
 {
@@ -10,16 +9,12 @@ namespace DataMapper.Extensions.Tests
     /// Column names, attributes, options and the custom converter. Data shapes and failure
     /// paths are in EdgeCaseTests.
     /// </summary>
-    public class MappingTests : IClassFixture<TestData>
+    public class MappingTests(TestData data) : IClassFixture<TestData>
     {
-        private readonly TestData _data;
-
-        public MappingTests(TestData data) => _data = data;
-
         [Fact]
         public void ColumnAttributeMapsDifferentColumnName()
         {
-            var account = _data.Account.Rows[0].MapTo<Account>();
+            var account = data.Account.Rows[0].MapTo<Account>();
             Assert.Equal(1L, account.Id);
             Assert.Equal("John Doe", account.DisplayName);
 
@@ -30,15 +25,15 @@ namespace DataMapper.Extensions.Tests
         [Fact]
         public void IgnoreMemberAttributeSkipsMember()
         {
-            var account = _data.Account.Rows[0].MapTo<Account>();
-            Assert.Equal("should be ignored", _data.Account.Rows[0]["Secret"]);
+            var account = data.Account.Rows[0].MapTo<Account>();
+            Assert.Equal("should be ignored", data.Account.Rows[0]["Secret"]);
             Assert.Null(account.Secret);
         }
 
         [Fact]
         public void AttributeMappedColumnsFallBackToDefaultsWhenMissing()
         {
-            var account = _data.Account.Rows[1].MapTo<Account>();
+            var account = data.Account.Rows[1].MapTo<Account>();
             Assert.Equal(2L, account.Id);
             Assert.Equal(string.Empty, account.DisplayName);
         }
@@ -46,25 +41,25 @@ namespace DataMapper.Extensions.Tests
         [Fact]
         public void MapsEnumsFromString()
         {
-            Assert.Equal(Status.Inactive, _data.Account.Rows[0].MapTo<Account>().Status);
+            Assert.Equal(Status.Inactive, data.Account.Rows[0].MapTo<Account>().Status);
         }
 
         [Fact]
         public void MapsGuidFromString()
         {
-            Assert.Equal(new Guid("8a0f1c2e-1111-2222-3333-444455556666"), _data.Account.Rows[0].MapTo<Account>().Key);
+            Assert.Equal(new Guid("8a0f1c2e-1111-2222-3333-444455556666"), data.Account.Rows[0].MapTo<Account>().Key);
         }
 
         [Fact]
         public void MapsTimeSpanFromString()
         {
-            Assert.Equal(TimeSpan.Parse("01:23:45"), _data.Account.Rows[0].MapTo<Account>().Duration);
+            Assert.Equal(TimeSpan.Parse("01:23:45"), data.Account.Rows[0].MapTo<Account>().Duration);
         }
 
         [Fact]
         public void NormalizedNamesMatchSnakeCaseColumns()
         {
-            var poco = _data.SnakeCaseRecord.Rows[0].MapTo<Customer>(new MapOptions { MatchNormalizedNames = true });
+            var poco = data.SnakeCaseRecord.Rows[0].MapTo<Customer>(new MapOptions { MatchNormalizedNames = true });
             Assert.Equal("John", poco.FirstName);
             Assert.Equal(23.3m, poco.RewardsPoints);
         }
@@ -72,7 +67,7 @@ namespace DataMapper.Extensions.Tests
         [Fact]
         public void NormalizedNamesAreOffByDefault()
         {
-            var poco = _data.SnakeCaseRecord.Rows[0].MapTo<Customer>();
+            var poco = data.SnakeCaseRecord.Rows[0].MapTo<Customer>();
             Assert.Equal(string.Empty, poco.FirstName);
             Assert.Null(poco.RewardsPoints);
         }
@@ -86,7 +81,7 @@ namespace DataMapper.Extensions.Tests
             };
 
             // Row 8 is the row with padded text.
-            var poco = _data.Row(_data.Customer, 8).MapTo<StringOnlyPoco>(options);
+            var poco = data.Row(data.Customer, 8).MapTo<StringOnlyPoco>(options);
             Assert.Equal("PADDED", poco.FirstName);
             Assert.Equal(string.Empty, poco.LastName);
         }
@@ -95,12 +90,12 @@ namespace DataMapper.Extensions.Tests
         public void ConvertToUsesInvariantCultureByDefault()
         {
             // Row 7 holds "1.5" as text.
-            Assert.Equal(1.5m, _data.Row(_data.Customer, 7).ConvertTo<decimal>("AmountText"));
+            Assert.Equal(1.5m, data.Row(data.Customer, 7).ConvertTo<decimal>("AmountText"));
 
             // A German culture reads the same text as 15 because '.' is its group separator,
             // which is why the default is no longer CultureInfo.CurrentCulture.
             var german = new MapOptions { Culture = CultureInfo.GetCultureInfo("de-DE") };
-            Assert.Equal(15m, _data.Row(_data.Customer, 7).ConvertTo<decimal>(german, "AmountText"));
+            Assert.Equal(15m, data.Row(data.Customer, 7).ConvertTo<decimal>(german, "AmountText"));
         }
 
         [Fact]
@@ -116,13 +111,13 @@ namespace DataMapper.Extensions.Tests
         [Fact]
         public void ConvertToSupportsEnums()
         {
-            Assert.Equal(Status.Inactive, _data.Row(_data.Customer, 7).ConvertTo<Status>("Status"));
+            Assert.Equal(Status.Inactive, data.Row(data.Customer, 7).ConvertTo<Status>("Status"));
         }
 
         [Fact]
         public void ConvertToSupportsGuid()
         {
-            Assert.Equal(new Guid("8a0f1c2e-1111-2222-3333-444455556666"), _data.Row(_data.Customer, 1).ConvertTo<Guid>("CustomerKey"));
+            Assert.Equal(new Guid("8a0f1c2e-1111-2222-3333-444455556666"), data.Row(data.Customer, 1).ConvertTo<Guid>("CustomerKey"));
         }
     }
 }

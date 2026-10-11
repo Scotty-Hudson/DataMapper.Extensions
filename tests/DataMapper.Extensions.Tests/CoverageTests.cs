@@ -1,11 +1,9 @@
 using System;
-using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
-using DataMapper.Extensions;
 
 namespace DataMapper.Extensions.Tests
 {
@@ -31,8 +29,8 @@ namespace DataMapper.Extensions.Tests
             table.Rows.Add(1L, DBNull.Value);
 
             var list = table.MapTo<NullPolicyPoco>(new MapOptions { NullHandling = NullHandling.Keep });
-            Assert.Single(list);
-            Assert.Equal(1L, list[0].Id);
+            var item = Assert.Single(list);
+            Assert.Equal(1L, item.Id);
         }
 
         [Fact]
@@ -42,8 +40,8 @@ namespace DataMapper.Extensions.Tests
             table.Rows.Add(1L);
 
             var list = table.EnumerateTo<NullPolicyPoco>().ToList();
-            Assert.Single(list);
-            Assert.Equal(1L, list[0].Id);
+            var item = Assert.Single(list);
+            Assert.Equal(1L, item.Id);
         }
 
         [Fact]
@@ -52,12 +50,10 @@ namespace DataMapper.Extensions.Tests
             var table = BuildTable(("Id", typeof(long)), ("Name", typeof(string)));
             table.Rows.Add(1L, "Person");
 
-            using (var reader = table.CreateDataReader())
-            {
-                var list = reader.MapTo<NullPolicyPoco>(new MapOptions { NullHandling = NullHandling.Keep });
-                Assert.Single(list);
-                Assert.Equal("Person", list[0].Name);
-            }
+            using var reader = table.CreateDataReader();
+            var list = reader.MapTo<NullPolicyPoco>(new MapOptions { NullHandling = NullHandling.Keep });
+            var item = Assert.Single(list);
+            Assert.Equal("Person", item.Name);
         }
 
         [Fact]
@@ -66,12 +62,10 @@ namespace DataMapper.Extensions.Tests
             var table = BuildTable(("Id", typeof(long)));
             table.Rows.Add(1L);
 
-            using (var reader = table.CreateDataReader())
-            {
-                var list = reader.EnumerateTo<NullPolicyPoco>().ToList();
-                Assert.Single(list);
-                Assert.Equal(1L, list[0].Id);
-            }
+            using var reader = table.CreateDataReader();
+            var list = reader.EnumerateTo<NullPolicyPoco>().ToList();
+            var item = Assert.Single(list);
+            Assert.Equal(1L, item.Id);
         }
 
         [Fact]
@@ -80,13 +74,11 @@ namespace DataMapper.Extensions.Tests
             var table = BuildTable(("Id", typeof(long)));
             table.Rows.Add(1L);
 
-            using (var reader = table.CreateDataReader())
-            {
-                var list = await reader.MapToAsync<NullPolicyPoco>(
-                    new MapOptions { NullHandling = NullHandling.Keep }, TestContext.Current.CancellationToken);
-                Assert.Single(list);
-                Assert.Equal(1L, list[0].Id);
-            }
+            using var reader = table.CreateDataReader();
+            var list = await reader.MapToAsync<NullPolicyPoco>(
+                new MapOptions { NullHandling = NullHandling.Keep }, TestContext.Current.CancellationToken);
+            var item = Assert.Single(list);
+            Assert.Equal(1L, item.Id);
         }
 
         [Fact]
@@ -96,22 +88,20 @@ namespace DataMapper.Extensions.Tests
             table.Rows.Add(1L, "one");
             table.Rows.Add(2L, "two");
 
-            using (var reader = table.CreateDataReader())
+            using var reader = table.CreateDataReader();
+            var cancelled = new CancellationTokenSource();
+            var seen = 0;
+
+            await Assert.ThrowsAsync<OperationCanceledException>(async () =>
             {
-                var cancelled = new CancellationTokenSource();
-                var seen = 0;
-
-                await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+                await foreach (var poco in reader.EnumerateToAsync<NullPolicyPoco>(new NullPolicyPoco(), MapOptions.Default, cancelled.Token))
                 {
-                    await foreach (var poco in reader.EnumerateToAsync<NullPolicyPoco>(new NullPolicyPoco(), MapOptions.Default, cancelled.Token))
-                    {
-                        seen++;
-                        cancelled.Cancel();
-                    }
-                });
+                    seen++;
+                    cancelled.Cancel();
+                }
+            });
 
-                Assert.Equal(1, seen);
-            }
+            Assert.Equal(1, seen);
         }
 
         // ---------- odd member shapes ----------
@@ -160,18 +150,17 @@ namespace DataMapper.Extensions.Tests
             Assert.Equal(string.Empty, table.EnumerateTo<StringOnlyPoco>((MapOptions)null).First().FirstName);
 
             // EnumerateTo on a reader
-            using (var reader = table.CreateDataReader())
-                Assert.Equal(string.Empty, reader.EnumerateTo<StringOnlyPoco>((MapOptions)null).First().FirstName);
+            using var reader = table.CreateDataReader();
+            Assert.Equal(string.Empty, reader.EnumerateTo<StringOnlyPoco>((MapOptions)null).First().FirstName);
 
-            // EnumerateToAsync
-            using (var reader = table.CreateDataReader())
+            // EnumerateToAsync. A separate reader, because the one above has already consumed
+            // its first record.
+            using var asyncReader = table.CreateDataReader();
+            await foreach (var p in asyncReader
+                .EnumerateToAsync<StringOnlyPoco>((MapOptions)null, TestContext.Current.CancellationToken))
             {
-                await foreach (var p in reader
-                    .EnumerateToAsync<StringOnlyPoco>((MapOptions)null, TestContext.Current.CancellationToken))
-                {
-                    Assert.Equal(string.Empty, p.FirstName);
-                    break;
-                }
+                Assert.Equal(string.Empty, p.FirstName);
+                break;
             }
         }
 
@@ -281,12 +270,10 @@ namespace DataMapper.Extensions.Tests
             var table = BuildTable(("Id", typeof(long)), ("Name", typeof(string)));
             table.Rows.Add(1L, "Person");
 
-            using (var reader = table.CreateDataReader())
-            {
-                var p = reader.MapTo<ReadOnlyPoco>()[0];
-                Assert.Equal(0L, p.Id);
-                Assert.Equal("Person", p.Name);
-            }
+            using var reader = table.CreateDataReader();
+            var p = reader.MapTo<ReadOnlyPoco>()[0];
+            Assert.Equal(0L, p.Id);
+            Assert.Equal("Person", p.Name);
         }
 
         [Fact]
@@ -295,12 +282,10 @@ namespace DataMapper.Extensions.Tests
             var table = BuildTable(("first_name", typeof(string)), ("rewards_points", typeof(decimal)));
             table.Rows.Add("John", 23.3m);
 
-            using (var reader = table.CreateDataReader())
-            {
-                var p = reader.MapTo<Customer>(new MapOptions { MatchNormalizedNames = true })[0];
-                Assert.Equal("John", p.FirstName);
-                Assert.Equal(23.3m, p.RewardsPoints);
-            }
+            using var reader = table.CreateDataReader();
+            var p = reader.MapTo<Customer>(new MapOptions { MatchNormalizedNames = true })[0];
+            Assert.Equal("John", p.FirstName);
+            Assert.Equal(23.3m, p.RewardsPoints);
         }
 
         [Fact]
@@ -312,8 +297,8 @@ namespace DataMapper.Extensions.Tests
             table.Rows.Add(1L);
 
             var list = table.MapTo<string>();
-            Assert.Single(list);
-            Assert.Equal(string.Empty, list[0]);
+            var item = Assert.Single(list);
+            Assert.Equal(string.Empty, item);
         }
 
         // ---------- conversion branches ----------

@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Data;
 using Xunit;
-using DataMapper.Extensions;
 
 namespace DataMapper.Extensions.Tests
 {
@@ -45,12 +43,10 @@ namespace DataMapper.Extensions.Tests
         {
             var customers = new List<Customer> { new Customer { Id = 2, FirstName = "Jake" } };
 
-            using (var reader = customers.ToDataReader())
-            {
-                var back = reader.MapTo<Customer>();
-                Assert.Equal(2L, back[0].Id);
-                Assert.Equal("Jake", back[0].FirstName);
-            }
+            using var reader = customers.ToDataReader();
+            var back = reader.MapTo<Customer>();
+            Assert.Equal(2L, back[0].Id);
+            Assert.Equal("Jake", back[0].FirstName);
         }
 
         [Fact]

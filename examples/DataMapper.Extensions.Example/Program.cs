@@ -2,7 +2,6 @@ using System;
 using System.Data;
 using System.Data.Common;
 using System.Linq;
-using DataMapper.Extensions;
 using Microsoft.Data.Sqlite;
 
 namespace DataMapper.Extensions.Example
@@ -139,17 +138,17 @@ namespace DataMapper.Extensions.Example
             int count = 0;
             long balanceSum = 0;
 
-            using (var reader = command.ExecuteReader())
-                foreach (var account in reader.EnumerateTo<Account>(options))
-                {
-                    count++;
-                    balanceSum += account.Balance ?? 0;
+            using var reader = command.ExecuteReader();
+            foreach (var account in reader.EnumerateTo<Account>(options))
+            {
+                count++;
+                balanceSum += account.Balance ?? 0;
 
-                    if (count <= 5)
-                        Console.WriteLine($"  {account.Id} {account.DisplayName} {account.Status} " +
-                                          $"{account.Key} {account.Balance} {account.Duration} " +
-                                          $"{account.CreatedOn:O} {account.IsActive}");
-                }
+                if (count <= 5)
+                    Console.WriteLine($"  {account.Id} {account.DisplayName} {account.Status} " +
+                                      $"{account.Key} {account.Balance} {account.Duration} " +
+                                      $"{account.CreatedOn:O} {account.IsActive}");
+            }
 
             stopwatch.Stop();
 

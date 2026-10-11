@@ -2,7 +2,6 @@
 using System.Data;
 using System.Linq;
 using Xunit;
-using DataMapper.Extensions;
 
 namespace DataMapper.Extensions.Tests
 {
@@ -18,7 +17,7 @@ namespace DataMapper.Extensions.Tests
             TestAllCustomerPropertiesById(c, dr);
         }
 
-        private void TestAllCustomerPropertiesById(Customer c, DataRow dr)
+        private  static void TestAllCustomerPropertiesById(Customer c, DataRow dr)
         {
             Assert.Equal(dr.ConvertTo<string>(nameof(c.FirstName)), c.FirstName);
             Assert.Equal(dr.ConvertTo<string>(nameof(c.LastName)), c.LastName);
@@ -34,11 +33,9 @@ namespace DataMapper.Extensions.Tests
         [Fact]
         public void DataReader_ReturnsCorrectListCount()
         {
-            using (var reader = _data.Customer.CreateDataReader())
-            {
-                var customerList = reader.MapTo<Customer>();
-                Assert.Equal(_data.Customer.Rows.Count, customerList.Count);
-            }
+            using var reader = _data.Customer.CreateDataReader();
+            var customerList = reader.MapTo<Customer>();
+            Assert.Equal(_data.Customer.Rows.Count, customerList.Count);
         }
 
         [Fact]
@@ -52,13 +49,11 @@ namespace DataMapper.Extensions.Tests
         public void DataReader_AreAllPropertiesMappedCorrectFromAllRows()
         {
             // Rows 5 and beyond hold deliberately bad data, so they are not part of this test.
-            using (var reader = _data.Customer.CreateDataReader())
+            using var reader = _data.Customer.CreateDataReader();
+            var customerList = reader.MapTo<Customer>();
+            foreach (var c in customerList)
             {
-                var customerList = reader.MapTo<Customer>();
-                foreach (var c in customerList)
-                {
-                    TestAllCustomerPropertiesById(c);
-                }
+                TestAllCustomerPropertiesById(c);
             }
         }
 
@@ -84,12 +79,10 @@ namespace DataMapper.Extensions.Tests
         [Fact]
         public void DataReader_DoesNullableTypeSetNullCorrectly()
         {
-            using (var reader = _data.Customer.CreateDataReader())
-            {
-                var customerList = reader.MapTo<Customer>();
-                var cust = customerList.First(c => c.Id == 2);
-                Assert.Null(cust.RewardsPoints);
-            }
+            using var reader = _data.Customer.CreateDataReader();
+            var customerList = reader.MapTo<Customer>();
+            var cust = customerList.First(c => c.Id == 2);
+            Assert.Null(cust.RewardsPoints);
         }
 
         [Fact]
@@ -110,12 +103,10 @@ namespace DataMapper.Extensions.Tests
         [Fact]
         public void DataReader_DoesNonNullableTypeSetDefaultCorrectly()
         {
-            using (var reader = _data.Customer.CreateDataReader())
-            {
-                var customerList = reader.MapTo<Customer>();
-                var cust = customerList.First(c => c.Id == 2);
-                Assert.Equal(0, cust.Zip);
-            }
+            using var reader = _data.Customer.CreateDataReader();
+            var customerList = reader.MapTo<Customer>();
+            var cust = customerList.First(c => c.Id == 2);
+            Assert.Equal(0, cust.Zip);
         }
 
         [Fact]
@@ -136,12 +127,10 @@ namespace DataMapper.Extensions.Tests
         [Fact]
         public void DataReader_DoesDBNullOverrideCorrectly()
         {
-            using (var reader = _data.Customer.CreateDataReader())
-            {
-                var customerList = reader.MapTo(new Customer { Zip = 0 });
-                var cust = customerList.First(c => c.Id == 2);
-                Assert.Equal(0, cust.Zip);
-            }
+            using var reader = _data.Customer.CreateDataReader();
+            var customerList = reader.MapTo(new Customer { Zip = 0 });
+            var cust = customerList.First(c => c.Id == 2);
+            Assert.Equal(0, cust.Zip);
         }
 
         [Fact]
@@ -162,12 +151,10 @@ namespace DataMapper.Extensions.Tests
         [Fact]
         public void DataReader_DoesDBNullReturnCorrectlyForString()
         {
-            using (var reader = _data.Customer.CreateDataReader())
-            {
-                var customerList = reader.MapTo<Customer>();
-                var cust = customerList.First(c => c.Id == 2);
-                Assert.Equal(string.Empty, cust.PhoneNumber);
-            }
+            using var reader = _data.Customer.CreateDataReader();
+            var customerList = reader.MapTo<Customer>();
+            var cust = customerList.First(c => c.Id == 2);
+            Assert.Equal(string.Empty, cust.PhoneNumber);
         }
 
         [Fact]
@@ -188,12 +175,10 @@ namespace DataMapper.Extensions.Tests
         [Fact]
         public void DataReader_DoesDBNullReturnCorrectlyForStringWithNullOverrideTurnedOff()
         {
-            using (var reader = _data.Customer.CreateDataReader())
-            {
-                var customerList = reader.MapTo<Customer>(false);
-                var cust = customerList.First(c => c.Id == 2);
-                Assert.Null(cust.PhoneNumber);
-            }
+            using var reader = _data.Customer.CreateDataReader();
+            var customerList = reader.MapTo<Customer>(false);
+            var cust = customerList.First(c => c.Id == 2);
+            Assert.Null(cust.PhoneNumber);
         }
 
         [Fact]

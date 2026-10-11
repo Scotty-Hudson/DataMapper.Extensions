@@ -27,17 +27,15 @@ namespace DataMapper.Extensions.Tests
         protected override DbCommand CreateDbCommand() => new FakeCommand(this);
     }
 
-    public class FakeCommand : DbCommand
+    public class FakeCommand(DbConnection connection) : DbCommand
     {
-        public FakeCommand(DbConnection connection) => DbConnection = connection;
-
         public override string CommandText { get; set; } = string.Empty;
         public override int CommandTimeout { get; set; } = 30;
         public override CommandType CommandType { get; set; } = CommandType.Text;
         public override bool DesignTimeVisible { get; set; }
         public override UpdateRowSource UpdatedRowSource { get; set; }
 
-        protected override DbConnection DbConnection { get; set; }
+        protected override DbConnection DbConnection { get; set; } = connection;
         protected override DbTransaction DbTransaction { get; set; }
         protected override DbParameterCollection DbParameterCollection { get; } = new FakeParameterCollection();
 

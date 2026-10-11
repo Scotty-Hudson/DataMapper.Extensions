@@ -5,7 +5,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
-using DataMapper.Extensions;
 
 namespace DataMapper.Extensions.Tests
 {
@@ -42,67 +41,57 @@ namespace DataMapper.Extensions.Tests
         [Fact]
         public void DataReaderEnumerateToStreamsRecords()
         {
-            using (var reader = BuildTable().CreateDataReader())
-            {
-                var streamed = reader.EnumerateTo<Customer>(MapOptions.Default).ToList();
-                Assert.Equal(3, streamed.Count);
-                Assert.Equal("Bob", streamed[2].FirstName);
-            }
+            using var reader = BuildTable().CreateDataReader();
+            var streamed = reader.EnumerateTo<Customer>(MapOptions.Default).ToList();
+            Assert.Equal(3, streamed.Count);
+            Assert.Equal("Bob", streamed[2].FirstName);
         }
 
         [Fact]
         public async Task DbDataReaderEnumerateToAsyncStreamsRecords()
         {
-            using (var reader = BuildTable().CreateDataReader())
-            {
-                var streamed = new List<Customer>();
-                await foreach (var customer in reader.EnumerateToAsync<Customer>(new Customer(), MapOptions.Default, TestContext.Current.CancellationToken))
-                    streamed.Add(customer);
+            using var reader = BuildTable().CreateDataReader();
+            var streamed = new List<Customer>();
+            await foreach (var customer in reader.EnumerateToAsync<Customer>(new Customer(), MapOptions.Default, TestContext.Current.CancellationToken))
+                streamed.Add(customer);
 
-                Assert.Equal(3, streamed.Count);
-                Assert.Equal("Jake", streamed[1].FirstName);
-            }
+            Assert.Equal(3, streamed.Count);
+            Assert.Equal("Jake", streamed[1].FirstName);
         }
 
         [Fact]
         public async Task EnumerateToAsyncWithoutDefaultPoco()
         {
-            using (var reader = BuildTable().CreateDataReader())
-            {
-                var streamed = new List<Customer>();
-                await foreach (var customer in reader.EnumerateToAsync<Customer>(MapOptions.Default, TestContext.Current.CancellationToken))
-                    streamed.Add(customer);
+            using var reader = BuildTable().CreateDataReader();
+            var streamed = new List<Customer>();
+            await foreach (var customer in reader.EnumerateToAsync<Customer>(MapOptions.Default, TestContext.Current.CancellationToken))
+                streamed.Add(customer);
 
-                Assert.Equal(3, streamed.Count);
-                Assert.Equal("John", streamed[0].FirstName);
-            }
+            Assert.Equal(3, streamed.Count);
+            Assert.Equal("John", streamed[0].FirstName);
         }
 
         [Fact]
         public async Task MapToAsyncReturnsAllRecords()
         {
-            using (var reader = BuildTable().CreateDataReader())
-            {
-                var streamed = await reader.MapToAsync<Customer>(new Customer(), MapOptions.Default, TestContext.Current.CancellationToken);
-                Assert.Equal(3, streamed.Count);
-                Assert.Equal("John", streamed[0].FirstName);
-            }
+            using var reader = BuildTable().CreateDataReader();
+            var streamed = await reader.MapToAsync<Customer>(new Customer(), MapOptions.Default, TestContext.Current.CancellationToken);
+            Assert.Equal(3, streamed.Count);
+            Assert.Equal("John", streamed[0].FirstName);
         }
 
         [Fact]
         public async Task MapToAsyncHonoursCancellationToken()
         {
-            using (var reader = BuildTable().CreateDataReader())
-            {
-                var cancelled = new CancellationTokenSource();
-                cancelled.Cancel();
+            using var reader = BuildTable().CreateDataReader();
+            var cancelled = new CancellationTokenSource();
+            cancelled.Cancel();
 
-                await Assert.ThrowsAsync<OperationCanceledException>(async () =>
-                {
-                    await foreach (var customer in reader.EnumerateToAsync<Customer>(new Customer(), MapOptions.Default, cancelled.Token))
-                    { }
-                });
-            }
+            await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+            {
+                await foreach (var customer in reader.EnumerateToAsync<Customer>(new Customer(), MapOptions.Default, cancelled.Token))
+                { }
+            });
         }
     }
 }

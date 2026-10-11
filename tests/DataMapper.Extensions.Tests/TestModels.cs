@@ -1,5 +1,4 @@
 using System;
-using DataMapper.Extensions;
 
 namespace DataMapper.Extensions.Tests
 {

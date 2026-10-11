@@ -3,7 +3,6 @@
 using System;
 using System.Data;
 using Xunit;
-using DataMapper.Extensions;
 
 namespace DataMapper.Extensions.Tests
 {

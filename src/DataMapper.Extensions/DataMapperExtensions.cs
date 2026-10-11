@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.Common;
-using System.Globalization;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -334,7 +333,7 @@ namespace DataMapper.Extensions
             // scan per member. Last match wins, which is the rule the reader path uses for
             // duplicate names.
             Dictionary<string, DataColumn> normalizedLookup = options.MatchNormalizedNames
-                ? new Dictionary<string, DataColumn>()
+                ? []
                 : null;
 
             if (normalizedLookup != null)
@@ -702,7 +701,7 @@ namespace DataMapper.Extensions
         // Kept for the original bool overloads: true meant "null strings to empty",
         // false meant "leave the template value".
         private static MapOptions WithNullStringsToEmpty(this MapOptions options, bool value)
-            => new MapOptions
+            => new()
             {
                 Culture = options.Culture,
                 NullHandling = value ? NullHandling.EmptyString : NullHandling.Keep,

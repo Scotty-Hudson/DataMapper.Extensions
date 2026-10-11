@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Linq;
 using Xunit;
-using DataMapper.Extensions;
 
 namespace DataMapper.Extensions.Tests
 {
@@ -49,12 +47,10 @@ namespace DataMapper.Extensions.Tests
         [Fact]
         public void PositionalRecordMapsThroughAReader()
         {
-            using (var reader = BuildRecordTable().CreateDataReader())
-            {
-                var records = reader.MapTo<PositionalRecord>();
-                Assert.Equal(2, records.Count);
-                Assert.Equal("John", records[0].Name);
-            }
+            using var reader = BuildRecordTable().CreateDataReader();
+            var records = reader.MapTo<PositionalRecord>();
+            Assert.Equal(2, records.Count);
+            Assert.Equal("John", records[0].Name);
         }
 
         [Fact]
