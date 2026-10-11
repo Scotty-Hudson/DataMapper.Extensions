@@ -247,6 +247,16 @@ namespace DataMapper.Extensions.Web.Data
             return await reader.MapToAsync<Job>(template, options, cancellationToken);
         }
 
+        public async Task<List<PlainJob>> GetPlainSampleAsync(PlainJob template, MapOptions options, CancellationToken cancellationToken)
+        {
+            using var connection = _database.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "select * from job where job_id in (7, 10, 14, 20, 21, 30, 42) order by job_id";
+
+            using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            return await reader.MapToAsync<PlainJob>(template, options, cancellationToken);
+        }
+
         public async Task<List<Technician>> GetTechniciansAsync(MapOptions options, CancellationToken cancellationToken)
         {
             using var connection = _database.Open();

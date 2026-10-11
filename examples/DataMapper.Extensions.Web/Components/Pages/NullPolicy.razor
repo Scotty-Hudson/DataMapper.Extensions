@@ -1,14 +1,91 @@
 @page "/null-policy"
 @inject JobRepository Jobs
 
+@code {
+    [CascadingParameter] public HttpContext Context { get; set; } = null!;
+
+    private sealed record Panel(string Name, string Detail, string Code, IReadOnlyList<PanelRow> Rows);
+
+    private sealed record PanelRow(long JobId, string? CustomerName, string? Notes, string? DisplayLabel, decimal? Amount);
+
+    private List<Panel> panels = [];
+
+    private static readonly Job Template = new()
+    {
+        CustomerName = "unknown",
+        Notes = "template",
+        DisplayLabel = "template",
+        Amount = 0.00m
+    };
+
+    private static readonly PlainJob PlainTemplate = new()
+    {
+        CustomerName = "unknown",
+        Notes = "template",
+        DisplayLabel = "template",
+        Amount = 0.00m
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        var cancellationToken = Context.RequestAborted;
+
+        var keep = new MapOptions { NullHandling = NullHandling.Keep, MatchNormalizedNames = true };
+
+        panels =
+        [
+            new Panel(
+                "EmptyString (default)",
+                "A non-nullable string is guaranteed non-null. The template here is a bare POCO, so a nullable member has nothing to keep and stays null.",
+                "reader.MapTo<Job>(options);   // options.NullHandling == NullHandling.EmptyString",
+                await Rows(new Job(), MapOptions.Default, cancellationToken)),
+
+            new Panel(
+                "Keep",
+                "Nothing is written when the column is DBNull, so the template POCO survives, including the default it declares for Amount. Notes is the exception: the model puts NullAs(Null) on that member, and a member attribute wins over the option, so notes is forced to null here.",
+                "reader.MapTo(template, new MapOptions { NullHandling = NullHandling.Keep });",
+                await Rows(Template, keep, cancellationToken)),
+
+            new Panel(
+                "Keep, without the attribute on notes",
+                "PlainJob is the same model with no NullAs on notes. Same option, same template, same rows: notes comes back as the template value. That is the whole difference between these two panels.",
+                "reader.MapTo(plainTemplate, new MapOptions { NullHandling = NullHandling.Keep });",
+                await PlainRows(PlainTemplate, keep, cancellationToken)),
+
+            new Panel(
+                "Null",
+                "Every member the mapper can write is forced to null, so the defaults the template declares are overwritten.",
+                "reader.MapTo(template, new MapOptions { NullHandling = NullHandling.Null });",
+                await Rows(Template, new MapOptions { NullHandling = NullHandling.Null, MatchNormalizedNames = true }, cancellationToken))
+        ];
+    }
+
+    private async Task<List<PanelRow>> Rows(Job template, MapOptions options, CancellationToken cancellationToken)
+    {
+        var jobs = await Jobs.GetSampleAsync(template, options, cancellationToken);
+
+        return jobs.Select(job => new PanelRow(job.JobId, job.CustomerName, job.Notes, job.DisplayLabel, job.Amount)).ToList();
+    }
+
+    private async Task<List<PanelRow>> PlainRows(PlainJob template, MapOptions options, CancellationToken cancellationToken)
+    {
+        var jobs = await Jobs.GetPlainSampleAsync(template, options, cancellationToken);
+
+        return jobs.Select(job => new PanelRow(job.JobId, job.CustomerName, job.Notes, job.DisplayLabel, job.Amount)).ToList();
+    }
+
+    private static string Show(string? value) => value is null ? "null" : (value == string.Empty ? "empty string" : value);
+}
+
 <PageTitle>Null policy</PageTitle>
 
 <h2>Null policy</h2>
 
 <p class="lede">
-    The same seven rows, mapped three ways. Rows 10, 20 and 30 have no customer name and no notes;
-    rows 7, 14 and 21 have no amount. Nulls enter the code base at the data source, so that is where
-    they are resolved.
+    The same seven rows, mapped four ways. Rows 10, 20 and 30 have no customer name and no notes;
+    rows 7, 14, 21 and 42 have no amount. The template POCO declares defaults for those columns
+    (<code>unknown</code>, <code>template</code>, <code>0.00m</code>), which is what each policy starts
+    from. Nulls enter the code base at the data source, so that is where they are resolved.
 </p>
 
 @foreach (var panel in panels)
@@ -44,59 +121,31 @@
     </table>
 }
 
+<h3>Why the nulls are still there in the Keep panel</h3>
+
 <p class="note">
-    The default policy is the one that lets the rest of the code base skip <code>!= null</code> checks:
-    a member the compiler considers non-nullable is never null. <code>Null</code> is the opposite, and it
-    does override that guarantee, which is why the page shows it as a choice rather than as a default.
+    Two things produce them, and both are the documented behaviour.
 </p>
 
-@code {
-    [CascadingParameter] public HttpContext Context { get; set; } = null!;
-    private sealed record Panel(string Name, string Detail, string Code, IReadOnlyList<PanelRow> Rows);
+<p class="note">
+    <strong>The member attribute wins.</strong> The policy is resolved as
+    <code>member.Handling ?? options.NullHandling</code>, so a <code>NullAs</code> on the model takes
+    precedence over whatever the options say. <code>Job.Notes</code> carries
+    <code>NullAs(NullHandling.Null)</code>, so it is forced to null under every policy, including Keep.
+    The third panel is the same run against a model without that attribute, which is why notes comes
+    back as the template value there.
+</p>
 
-    private sealed record PanelRow(long JobId, string? CustomerName, string? Notes, string? DisplayLabel, decimal? Amount);
+<p class="note">
+    <strong>Keep preserves the template, it does not invent a value.</strong> The template POCO declares
+    a default for <code>Amount</code> (<code>0.00m</code>), which is why the two Keep panels show
+    <code>0.00</code> where the column is DBNull and the Null panel shows <code>null</code>: the first two
+    keep what the template holds, the third overwrites it. If the template had nothing in it, Keep could
+    only produce null, because there is no empty instance of a decimal.
+</p>
 
-    private List<Panel> panels = [];
-
-    private static readonly Job Template = new()
-    {
-        CustomerName = "unknown",
-        Notes = "template",
-        DisplayLabel = "template"
-    };
-
-    protected override async Task OnInitializedAsync()
-    {
-        var cancellationToken = Context.RequestAborted;
-
-        panels =
-        [
-            new Panel(
-                "EmptyString (default)",
-                "A non-nullable string is guaranteed non-null; an annotated nullable string stays null.",
-                "reader.MapTo<Job>(options);   // options.NullHandling == NullHandling.EmptyString",
-                await Rows(new Job(), MapOptions.Default, cancellationToken)),
-
-            new Panel(
-                "Keep",
-                "Nothing is written when the column is DBNull, so the template POCO survives.",
-                "reader.MapTo(template, new MapOptions { NullHandling = NullHandling.Keep });",
-                await Rows(Template, new MapOptions { NullHandling = NullHandling.Keep, MatchNormalizedNames = true }, cancellationToken)),
-
-            new Panel(
-                "Null",
-                "Every member the mapper can write is forced to null, including the non-nullable ones.",
-                "reader.MapTo(template, new MapOptions { NullHandling = NullHandling.Null });",
-                await Rows(Template, new MapOptions { NullHandling = NullHandling.Null, MatchNormalizedNames = true }, cancellationToken))
-        ];
-    }
-
-    private async Task<List<PanelRow>> Rows(Job template, MapOptions options, CancellationToken cancellationToken)
-    {
-        var jobs = await Jobs.GetSampleAsync(template, options, cancellationToken);
-
-        return jobs.Select(job => new PanelRow(job.JobId, job.CustomerName, job.Notes, job.DisplayLabel, job.Amount)).ToList();
-    }
-
-    private static string Show(string? value) => value is null ? "null" : (value == string.Empty ? "empty string" : value);
-}
+<p class="note">
+    The default policy is the one that lets the rest of the code base skip <code>!= null</code> checks:
+    a member the compiler considers non-nullable is never null. That guarantee is per member, and a
+    <code>NullAs(Null)</code> on the model is an explicit decision to opt that member out of it.
+</p>
