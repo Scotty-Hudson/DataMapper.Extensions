@@ -1,5 +1,7 @@
 # DataMapper.Extensions
 
+[![NuGet](https://img.shields.io/nuget/v/DataMapper.Extensions.svg)](https://www.nuget.org/packages/DataMapper.Extensions)
+
 Extension methods that map `IDataReader`, `DataTable` and `DataRow` rows onto POCOs and records,
 map POCOs and records back into a `DataTable` or `DbDataReader`, and bind parameters from an object
 onto a `DbCommand`.
