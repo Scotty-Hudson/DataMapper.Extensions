@@ -28,26 +28,9 @@
 <h2>Streaming</h2>
 
 <p class="lede">
-    <code>EnumerateToAsync</code> yields one record at a time, so a result set that does not fit in
-    memory can still be read, and the token is checked between records. htmx is what shows that
-    incrementally: each chunk asks for the next one when it is revealed, and the chain stops when a
-    chunk comes back with no more rows.
-</p>
-
-<p class="note">
-    Each chunk is its own request, so the cursor is a <code>job_id</code> rather than a live reader.
-    Nothing can survive between requests, which is the honest limit of doing this without a circuit.
-    Without htmx this page shows the first chunk only.
-</p>
-
-<p class="note">
-    The Run button swaps the chunk region instead of navigating, which is what keeps the page where you
-    were: a swap does not move the scroll position, a document navigation does. Without htmx the form
-    submits to <code>/stream</code> as a normal GET and the browser resets scroll, as it does on every
-    full navigation. A swap leaves the address bar alone, so the endpoint answers with an
-    <code>HX-Push-Url</code> header holding the page URL, which is what a refresh or a shared link
-    would load. Only the run itself is pushed: the chunks the chain appends would each overwrite the
-    address bar with a cursor.
+    <code>EnumerateToAsync</code> yields one record at a time, so a result set that does not fit in memory
+    can still be read, and the cancellation token is checked between records. This chunk stopped part way
+    through because the token was cancelled before the limit was reached.
 </p>
 
 <form method="get" action="/stream" hx-get="/stream/chunk" hx-target="#chunk" hx-swap="outerHTML" hx-push-url="true" class="filter fields">

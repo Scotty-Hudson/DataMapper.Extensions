@@ -19,16 +19,9 @@
 <h2>Jobs</h2>
 
 <p class="lede">
-    The form is a plain HTML GET form with htmx attributes on it. Without htmx it submits to
-    <code>/jobs</code> and the whole page renders; with htmx it submits to <code>/jobs/results</code>
-    and only the region below is replaced. Both paths run the same repository code, so the only thing
-    the htmx path saves is the parts of the page that did not change.
-</p>
-
-<p class="note">
-    A swap keeps the page where it was, which a navigation does not. It also leaves the address bar
-    alone, so the endpoint sends <code>HX-Push-Url</code> with the <code>/jobs</code> URL built from the
-    filter it parsed: that is the URL a refresh or a shared link can load as a whole page.
+    <code>AddParameters</code> fills a command from the model, and the <code>Column</code> names are what the
+    parameter names come from. Only the filter fields that have a value are added, so the parameter table
+    below changes with the form.
 </p>
 
 <form method="get" action="/jobs" hx-get="/jobs/results" hx-target="#results" hx-swap="outerHTML" hx-push-url="true" class="filter fields">
