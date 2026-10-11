@@ -1,0 +1,73 @@
+@page "/jobs"
+@inject JobRepository Repository
+
+@code {
+    [CascadingParameter] public HttpContext Context { get; set; } = null!;
+
+    private JobFilter filter = new();
+    private QueryResult result = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        filter = JobFilter.FromQuery(Context.Request.Query);
+        result = await Repository.QueryAsync(filter, Context.RequestAborted);
+    }
+}
+
+<PageTitle>Jobs</PageTitle>
+
+<h2>Jobs</h2>
+
+<p class="lede">
+    The form is a plain HTML GET form with htmx attributes on it. Without htmx it submits to
+    <code>/jobs</code> and the whole page renders; with htmx it submits to <code>/jobs/results</code>
+    and only the region below is replaced. Both paths run the same repository code, so the only thing
+    the htmx path saves is the parts of the page that did not change.
+</p>
+
+<form method="get" action="/jobs" hx-get="/jobs/results" hx-target="#results" hx-swap="outerHTML" class="filter fields">
+    <label>
+        Customer contains
+        <input type="text" name="customer_like" value="@filter.CustomerLike" placeholder="customer-123" />
+    </label>
+
+    <label>
+        Status
+        <select name="status">
+            <option value="">any</option>
+            @foreach (var status in Enum.GetValues<JobStatus>())
+            {
+                if (filter.Status == status)
+                {
+                    <option value="@status" selected>@status</option>
+                }
+                else
+                {
+                    <option value="@status">@status</option>
+                }
+            }
+        </select>
+    </label>
+
+    <label>
+        From date
+        <input type="date" name="from_date" value="@(filter.FromDate?.ToString("yyyy-MM-dd"))" />
+    </label>
+
+    <label>
+        Min amount
+        <input type="text" name="min_amount" value="@filter.MinAmount" />
+    </label>
+
+    <div class="field">
+        <span>&nbsp;</span>
+        <button type="submit">Filter</button>
+    </div>
+
+    <div class="field">
+        <span>&nbsp;</span>
+        <a class="quiet" href="/jobs">Reset</a>
+    </div>
+</form>
+
+<JobResults Filter="@filter" Result="@result" />

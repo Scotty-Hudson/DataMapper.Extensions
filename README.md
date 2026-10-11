@@ -268,6 +268,47 @@ the value, which is how it stores them; the library leaves those at `DbType.Obje
 real column types, so a text column reads back as a string, which is what exercises the `Guid`,
 `TimeSpan` and `DateTime` conversions from strings.
 
+## Web example
+
+`examples/DataMapper.Extensions.Web` is a Blazor web app that uses static server rendering only: no
+interactive render mode, no WebAssembly, no prerendering, and no Blazor client boot script. It consumes
+the published package rather than the source in this repo, so it is an ordinary consumer.
+
+```bash
+dotnet run --project examples/DataMapper.Extensions.Web
+```
+
+With no circuit there are no component events, so every interaction is a link or a plain HTML form:
+filters travel in the query string, and the actions post to minimal API endpoints. It is a small
+report site over a seeded SQLite database, and the extension methods are the whole data layer.
+
+The only client script is htmx (2.0.11, vendored in `wwwroot`), and it is used only where a full page
+reload would otherwise be the only option: the jobs filter and pager swap the results region, the
+streaming page appends one chunk at a time as each chunk is revealed, and the archive replay swaps the
+archive region. Those endpoints return a fragment through `RazorComponentResult`. Where htmx does not
+fit it is not used — a CSV download cannot be swapped because the response is a file rather than
+markup, and dark mode is a browser preference rather than something a fragment can change. Every htmx
+element keeps a plain `href` or form action, so the app still works with the script disabled.
+
+| Page | Feature |
+| --- | --- |
+| `/` | `MapToAsync` on an aggregate row |
+| `/jobs` | `AddParameters` from a filter, and the SQL the names in it produced |
+| `/jobs/{id}` | the `DataRow` path and `ConvertTo` |
+| `/null-policy` | the three policies over the same rows, with a template POCO |
+| `/options` | normalized names, culture, and a custom converter |
+| `/stream` | `EnumerateToAsync` with a cancellation token, appended chunk by chunk |
+| `/export` | `ToDataTable`, `ToDataReader`, CSV, and a replay into a table |
+| `/params` | object, anonymous type, and dictionary, with the `DbType` chosen for each |
+
+The seed data is shaped so each feature has something to do: snake_case columns, text-encoded `Guid`,
+`DateOnly`, `TimeOnly` and `TimeSpan`, nulls at regular intervals, a decimal string that a German
+culture reads as 15, and padded text for the converter.
+
+One thing the app makes visible: parameter names are matched exactly by the provider, so a member
+whose name differs from the placeholder in the SQL needs a `Column` attribute even when mapping itself
+would have matched it case insensitively.
+
 ## ConvertTo
 
 ```c#

@@ -1,0 +1,129 @@
+@page "/jobs/{id:long}"
+@inject JobRepository Jobs
+
+<PageTitle>Job @Id</PageTitle>
+
+<h2>Job @Id</h2>
+
+@if (row is null)
+{
+    <p class="note">No row with job_id @Id.</p>
+}
+else
+{
+    <p class="lede">
+        This is the <code>DataRow</code> path. The row is mapped onto the model, and then two single columns
+        are converted on their own with <code>ConvertTo</code>, which is the only path that has it.
+    </p>
+
+    <table class="grid">
+        <thead>
+            <tr>
+                <th>Member</th>
+                <th>Raw column</th>
+                <th>Mapped value</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (DataColumn column in row.Table.Columns)
+            {
+                <tr>
+                    <td><code>@column.ColumnName</code></td>
+                    <td>@(row[column] is DBNull ? "DBNull" : row[column]) <em>(@row[column]?.GetType().Name)</em></td>
+                    <td>@Member(column.ColumnName)</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <h3>ConvertTo</h3>
+
+    <CodeSnippet Code="@snippet" />
+
+    <table class="grid">
+        <tbody>
+            <tr>
+                <td><code>ConvertTo&lt;decimal&gt;("amount")</code></td>
+                <td>@amount</td>
+            </tr>
+            <tr>
+                <td><code>ConvertTo("amount", 0m)</code></td>
+                <td>@amountWithDefault.ToString(CultureInfo.InvariantCulture)</td>
+            </tr>
+            <tr>
+                <td><code>ConvertTo&lt;string&gt;("notes")</code></td>
+                <td>@(notes is null ? "null" : (notes == string.Empty ? "empty string" : notes))</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <p class="note">
+        <code>NullHandling</code> is a mapping policy, and <code>ConvertTo</code> has no POCO to apply it to, so
+        the default-value overload is the fallback here.
+    </p>
+}
+
+@code {
+    [CascadingParameter] public HttpContext Context { get; set; } = null!;
+    [Parameter] public long Id { get; set; }
+
+    private DataRow row = null!;
+    private Job job = null!;
+    private string amount = string.Empty;
+    private decimal amountWithDefault;
+    private string? notes;
+
+    private const string snippet = """
+        var row = table.Rows[0];
+
+        var job = row.MapTo<Job>(options);
+        var amount = row.ConvertTo<decimal>("amount");
+        var withDefault = row.ConvertTo("amount", 0m);
+        var notes = row.ConvertTo<string>("notes");
+        """;
+
+    protected override async Task OnInitializedAsync()
+    {
+        row = await Jobs.GetRowAsync(Id, Context.RequestAborted);
+
+        if (row is null) return;
+
+        job = row.MapTo<Job>(new MapOptions { MatchNormalizedNames = true });
+        try
+        {
+            amount = row.ConvertTo<decimal>("amount").ToString(CultureInfo.InvariantCulture);
+        }
+        catch (InvalidCastException)
+        {
+            // Documented behaviour: DBNull becomes null only for a target type that is nullable
+            // in the reflection sense, and decimal is not, so this is the failure path.
+            amount = "InvalidCastException: DBNull is not null for a non-nullable target type";
+        }
+
+        amountWithDefault = row.ConvertTo("amount", 0m);
+        notes = row.ConvertTo<string>("notes");
+    }
+
+    private string Member(string columnName)
+    {
+        var value = columnName switch
+        {
+            "job_id" => job.JobId.ToString(CultureInfo.InvariantCulture),
+            "customer_name" => Show(job.CustomerName),
+            "status" => job.Status.ToString(),
+            "job_key" => job.Key.ToString(),
+            "scheduled_on" => job.ScheduledOn.ToString("yyyy-MM-dd"),
+            "start_time" => job.StartTime.ToString("HH:mm:ss"),
+            "duration" => job.Duration.ToString(@"hh\:mm", CultureInfo.InvariantCulture),
+            "amount" => job.Amount?.ToString(CultureInfo.InvariantCulture) ?? "null",
+            "technician_id" => job.TechnicianId.ToString(CultureInfo.InvariantCulture),
+            "notes" => Show(job.Notes),
+            "display_label" => Show(job.DisplayLabel),
+            _ => "not a member"
+        };
+
+        return value;
+    }
+
+    private static string Show(string? value) => value is null ? "null" : (value == string.Empty ? "empty string" : value);
+}

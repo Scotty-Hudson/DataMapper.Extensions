@@ -1,0 +1,266 @@
+:root {
+    color-scheme: light;
+
+    --bg: #ffffff;
+    --ink: #1b1f24;
+    --muted: #5c6672;
+    --line: #d8dee6;
+    --accent: #0b6b62;
+    --accent-hover: #095851;
+    --accent-ink: #ffffff;
+    --card: #f6f8fa;
+    --field: #ffffff;
+}
+
+/* No JavaScript, so the scheme comes from the browser preference. A static render has no state
+   to remember a manual choice, which is why there is no toggle. */
+@media (prefers-color-scheme: dark) {
+    :root {
+        color-scheme: dark;
+
+        --bg: #14181d;
+        --ink: #e6ebf1;
+        --muted: #99a4b1;
+        --line: #2b323b;
+        --accent: #4fb3a4;
+        --accent-hover: #3f9487;
+        --accent-ink: #101716;
+        --card: #1b2127;
+        --field: #171c21;
+    }
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+.site {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 24px 20px 48px;
+}
+
+.masthead h1 {
+    margin: 0;
+    font-size: 22px;
+}
+
+.tagline {
+    margin: 6px 0 0;
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.tagline a {
+    color: inherit;
+    border-bottom: 1px solid var(--line);
+}
+
+.nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin: 18px 0 24px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--line);
+}
+
+.nav a {
+    font-size: 14px;
+}
+
+main h2 {
+    margin: 0 0 12px;
+    font-size: 20px;
+}
+
+main h3 {
+    margin: 24px 0 8px;
+    font-size: 16px;
+}
+
+.lede,
+.note,
+.footer {
+    max-width: 700px;
+}
+
+.lede {
+    margin: 0 0 16px;
+}
+
+.note {
+    margin: 12px 0;
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.quiet {
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.card-label {
+    font-size: 13px;
+    color: var(--muted);
+}
+
+.card-value {
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.card-note {
+    font-size: 12px;
+    color: var(--muted);
+}
+
+table.grid {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 8px 0 16px;
+    font-size: 14px;
+}
+
+table.grid th,
+table.grid td {
+    border-bottom: 1px solid var(--line);
+    padding: 7px 10px;
+    text-align: left;
+    vertical-align: top;
+}
+
+table.grid th {
+    color: var(--muted);
+    font-weight: 600;
+    background: var(--card);
+}
+
+code {
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 13px;
+    color: var(--ink);
+}
+
+pre.snippet {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px 14px;
+    overflow-x: auto;
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    font-size: 13px;
+    margin: 0 0 16px;
+}
+
+form.filter {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin: 16px 0;
+}
+
+/* A form where every item is a caption above a control: the button has to line up with the
+   controls, not with the middle of the tallest item, so the row aligns at the top and the button
+   carries an empty caption of the same height as the others. */
+form.filter.fields {
+    align-items: flex-start;
+}
+
+form.filter label,
+form.filter .field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+    color: var(--muted);
+}
+
+input,
+select {
+    padding: 6px 8px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    font: inherit;
+    color: var(--ink);
+    background: var(--field);
+}
+
+button {
+    /* Same padding as an input, so a button in a captioned row is exactly as tall as the control
+       next to it. */
+    padding: 6px 14px;
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font: inherit;
+    cursor: pointer;
+}
+
+button:hover {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+}
+
+.pager {
+    display: flex;
+    gap: 14px;
+    margin-top: 12px;
+}
+
+/* htmx adds htmx-request to the element that is in flight. Nothing else is needed: the swap is the
+   feedback, and the plain form still works when the script is not running. */
+.htmx-request {
+    opacity: 0.55;
+}
+
+.chunk {
+    margin-bottom: 16px;
+}
+
+.chunk.htmx-request {
+    opacity: 0.6;
+}
+
+.footer {
+    margin-top: 32px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 13px;
+}

@@ -1,0 +1,25 @@
+@code {
+    [Parameter] public IReadOnlyList<BoundParameter> Parameters { get; set; } = [];
+}
+
+<table class="grid">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Value</th>
+            <th>DbType</th>
+            <th>Source</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var parameter in Parameters)
+        {
+            <tr>
+                <td><code>@parameter.Name</code></td>
+                <td>@(parameter.Value is DBNull ? "DBNull.Value" : parameter.Value)</td>
+                <td>@parameter.DbType</td>
+                <td>@parameter.Source</td>
+            </tr>
+        }
+    </tbody>
+</table>

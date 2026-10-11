@@ -1,0 +1,102 @@
+@page "/null-policy"
+@inject JobRepository Jobs
+
+<PageTitle>Null policy</PageTitle>
+
+<h2>Null policy</h2>
+
+<p class="lede">
+    The same seven rows, mapped three ways. Rows 10, 20 and 30 have no customer name and no notes;
+    rows 7, 14 and 21 have no amount. Nulls enter the code base at the data source, so that is where
+    they are resolved.
+</p>
+
+@foreach (var panel in panels)
+{
+    <h3>@panel.Name</h3>
+
+    <p class="note">@panel.Detail</p>
+
+    <CodeSnippet Code="@panel.Code" />
+
+    <table class="grid">
+        <thead>
+            <tr>
+                <th>job_id</th>
+                <th>customer_name</th>
+                <th>notes</th>
+                <th>display_label</th>
+                <th>amount</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var job in panel.Rows)
+            {
+                <tr>
+                    <td><a href="/jobs/@job.JobId">@job.JobId</a></td>
+                    <td>@Show(job.CustomerName)</td>
+                    <td>@Show(job.Notes)</td>
+                    <td>@Show(job.DisplayLabel)</td>
+                    <td>@(job.Amount?.ToString(CultureInfo.InvariantCulture) ?? "null")</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<p class="note">
+    The default policy is the one that lets the rest of the code base skip <code>!= null</code> checks:
+    a member the compiler considers non-nullable is never null. <code>Null</code> is the opposite, and it
+    does override that guarantee, which is why the page shows it as a choice rather than as a default.
+</p>
+
+@code {
+    [CascadingParameter] public HttpContext Context { get; set; } = null!;
+    private sealed record Panel(string Name, string Detail, string Code, IReadOnlyList<PanelRow> Rows);
+
+    private sealed record PanelRow(long JobId, string? CustomerName, string? Notes, string? DisplayLabel, decimal? Amount);
+
+    private List<Panel> panels = [];
+
+    private static readonly Job Template = new()
+    {
+        CustomerName = "unknown",
+        Notes = "template",
+        DisplayLabel = "template"
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        var cancellationToken = Context.RequestAborted;
+
+        panels =
+        [
+            new Panel(
+                "EmptyString (default)",
+                "A non-nullable string is guaranteed non-null; an annotated nullable string stays null.",
+                "reader.MapTo<Job>(options);   // options.NullHandling == NullHandling.EmptyString",
+                await Rows(new Job(), MapOptions.Default, cancellationToken)),
+
+            new Panel(
+                "Keep",
+                "Nothing is written when the column is DBNull, so the template POCO survives.",
+                "reader.MapTo(template, new MapOptions { NullHandling = NullHandling.Keep });",
+                await Rows(Template, new MapOptions { NullHandling = NullHandling.Keep, MatchNormalizedNames = true }, cancellationToken)),
+
+            new Panel(
+                "Null",
+                "Every member the mapper can write is forced to null, including the non-nullable ones.",
+                "reader.MapTo(template, new MapOptions { NullHandling = NullHandling.Null });",
+                await Rows(Template, new MapOptions { NullHandling = NullHandling.Null, MatchNormalizedNames = true }, cancellationToken))
+        ];
+    }
+
+    private async Task<List<PanelRow>> Rows(Job template, MapOptions options, CancellationToken cancellationToken)
+    {
+        var jobs = await Jobs.GetSampleAsync(template, options, cancellationToken);
+
+        return jobs.Select(job => new PanelRow(job.JobId, job.CustomerName, job.Notes, job.DisplayLabel, job.Amount)).ToList();
+    }
+
+    private static string Show(string? value) => value is null ? "null" : (value == string.Empty ? "empty string" : value);
+}

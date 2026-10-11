@@ -1,0 +1,60 @@
+@code {
+    [Parameter] public int Inserted { get; set; }
+    [Parameter] public IReadOnlyList<JobExport> Rows { get; set; } = [];
+}
+
+<section id="archive">
+    <h3>Archive table</h3>
+
+    @if (Inserted > 0)
+    {
+        <p class="note">@Inserted rows inserted from the reader.</p>
+    }
+
+    @if (Rows.Count == 0)
+    {
+        <p class="note">Nothing archived yet. The form above writes the current filter into the table.</p>
+    }
+    else
+    {
+        <table class="grid">
+            <thead>
+                <tr>
+                    <th>job_id</th>
+                    <th>customer_name</th>
+                    <th>status</th>
+                    <th>scheduled_on</th>
+                    <th>start_time</th>
+                    <th>duration</th>
+                    <th>amount</th>
+                    <th>notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in Rows)
+                {
+                    <tr>
+                        <td>@row.JobId</td>
+                        <td>@Show(row.CustomerName)</td>
+                        <td>@row.Status</td>
+                        <td>@row.ScheduledOn.ToString("yyyy-MM-dd")</td>
+                        <td>@row.StartTime.ToString("HH:mm:ss")</td>
+                        <td>@row.Duration.ToString(@"hh\:mm", CultureInfo.InvariantCulture)</td>
+                        <td>@(row.Amount?.ToString(CultureInfo.InvariantCulture) ?? "null")</td>
+                        <td>@Show(row.Notes)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <p class="note">
+            These rows were read back out of the archive as text, which is what exercises the
+            conversions again: <code>Guid</code>, <code>DateOnly</code>, <code>TimeOnly</code> and
+            <code>TimeSpan</code> all come back as strings and the extensions parse them.
+        </p>
+    }
+</section>
+
+@code {
+    private static string Show(string? value) => value is null ? "null" : (value == string.Empty ? "empty string" : value);
+}

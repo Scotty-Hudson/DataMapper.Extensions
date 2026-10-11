@@ -1,0 +1,43 @@
+@code {
+    [Parameter] public StreamResult Chunk { get; set; } = null!;
+    [Parameter] public string FilterQuery { get; set; } = string.Empty;
+}
+
+@{
+    // Blazor leaves an attribute out when its value is null, so a finished result set renders a
+    // plain chunk with no trigger and the chain stops on its own.
+    var prefix = string.IsNullOrEmpty(FilterQuery) ? string.Empty : $"{FilterQuery}&";
+    var next = Chunk.More ? $"/stream/chunk?{prefix}after={Chunk.Next}&chunk={Chunk.ChunkSize}" : null;
+}
+
+<div class="chunk" hx-get="@next" hx-trigger="revealed" hx-swap="afterend">
+    <p class="note">@Chunk.Rows.Count rows in @Chunk.ElapsedMs ms@(Chunk.Outcome)</p>
+
+    <table class="grid">
+        <thead>
+            <tr>
+                <th># in chunk</th>
+                <th>job_id</th>
+                <th>customer_name</th>
+                <th>status</th>
+                <th>ms since chunk start</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in Chunk.Rows)
+            {
+                <tr>
+                    <td>@row.Position</td>
+                    <td><a href="/jobs/@row.Job.JobId">@row.Job.JobId</a></td>
+                    <td>@Show(row.Job.CustomerName)</td>
+                    <td>@row.Job.Status</td>
+                    <td>@row.ElapsedMs</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    private static string Show(string? value) => value is null ? "null" : (value == string.Empty ? "empty string" : value);
+}

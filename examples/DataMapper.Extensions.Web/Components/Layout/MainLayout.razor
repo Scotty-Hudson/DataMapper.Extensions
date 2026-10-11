@@ -1,0 +1,33 @@
+@inherits LayoutComponentBase
+
+<div class="site">
+    <header class="masthead">
+        <h1>Dispatch Board</h1>
+        <p class="tagline">
+            Blazor static server rendering: no circuit, no WebAssembly, no prerendering. Every row on
+            every page is mapped by <a href="https://www.nuget.org/packages/DataMapper.Extensions">DataMapper.Extensions</a>.
+        </p>
+    </header>
+
+    <nav class="nav">
+        <a href="/">Dashboard</a>
+        <a href="/jobs">Jobs</a>
+        <a href="/null-policy">Null policy</a>
+        <a href="/options">Options</a>
+        <a href="/stream">Streaming</a>
+        <a href="/export">Export</a>
+        <a href="/params">Parameters</a>
+        <a href="/about">About</a>
+    </nav>
+
+    <main>
+        @Body
+    </main>
+
+    <footer class="footer">
+        Static rendering has no client-side state, so every page here is one server render. Filters
+        travel in the query string and actions post to minimal API endpoints. htmx is the only client
+        script, used to swap a fragment where a plain form would have to reload the whole page; every
+        htmx element still has a plain <code>href</code> or form action, so the app works without it.
+    </footer>
+</div>

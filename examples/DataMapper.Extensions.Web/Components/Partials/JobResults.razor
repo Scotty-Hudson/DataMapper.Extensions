@@ -1,0 +1,38 @@
+@code {
+    [Parameter] public JobFilter Filter { get; set; } = new();
+    [Parameter] public QueryResult Result { get; set; } = null!;
+}
+
+@* This is the region htmx replaces. It has to be self-contained, which is why the SQL and the
+   parameters live here as well: filtering changes them, so a swap that only replaced the table
+   would leave the SQL from the previous request on the page. *@
+
+<section id="results">
+    <h3>The SQL, and what the parameter builder produced</h3>
+
+    <CodeSnippet Code="@Result.Sql" />
+
+    <ParamTable Parameters="@Result.Parameters" />
+
+    <h3>@Result.Jobs.Count rows of @Result.Total &mdash; page @Result.Page, @Result.PageSize per page, @Result.ElapsedMs ms</h3>
+
+    <JobTable Jobs="@Result.Jobs" />
+
+    <div class="pager">
+        @if (Result.Page > 1)
+        {
+            <a href="/jobs?@Filter.ToQueryString(Result.Page - 1)"
+               hx-get="/jobs/results?@Filter.ToQueryString(Result.Page - 1)"
+               hx-target="#results"
+               hx-swap="outerHTML">Previous</a>
+        }
+
+        @if (Result.Jobs.Count == Result.PageSize)
+        {
+            <a href="/jobs?@Filter.ToQueryString(Result.Page + 1)"
+               hx-get="/jobs/results?@Filter.ToQueryString(Result.Page + 1)"
+               hx-target="#results"
+               hx-swap="outerHTML">Next</a>
+        }
+    </div>
+</section>

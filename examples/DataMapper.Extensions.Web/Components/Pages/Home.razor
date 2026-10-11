@@ -1,0 +1,55 @@
+@page "/"
+@inject JobRepository Jobs
+
+<PageTitle>Dashboard</PageTitle>
+
+<h2>Dashboard</h2>
+
+<p class="lede">
+    Every number on this page came from one aggregate row mapped onto a POCO. The aliases in the SQL are
+    the <code>Column</code> names on the model, so the mapper had nothing else to decide.
+</p>
+
+<div class="cards">
+    <StatCard Label="Total jobs" Value="@stats.TotalJobs.ToString(CultureInfo.InvariantCulture)" Note="one aggregate row, MapToAsync" />
+    <StatCard Label="Completed" Value="@stats.Completed.ToString(CultureInfo.InvariantCulture)" Note="status = 3, an enum from an integer column" />
+    <StatCard Label="Open" Value="@stats.OpenJobs.ToString(CultureInfo.InvariantCulture)" Note="New, Scheduled, InProgress" />
+    <StatCard Label="Total amount" Value="@stats.TotalAmount.ToString(CultureInfo.InvariantCulture)" Note="text column converted to decimal" />
+    <StatCard Label="Null notes" Value="@stats.NullNotes.ToString(CultureInfo.InvariantCulture)" Note="what the null policy resolves" />
+    <StatCard Label="Null customer names" Value="@stats.NullCustomerName.ToString(CultureInfo.InvariantCulture)" Note="becomes an empty string by default" />
+    <StatCard Label="Technicians" Value="@stats.Technicians.ToString(CultureInfo.InvariantCulture)" Note="snake_case columns, normalized match" />
+    <StatCard Label="Round trip" Value="@elapsed" Note="execute and map, one connection" />
+</div>
+
+<h3>The code that produced this page</h3>
+
+<CodeSnippet Code="@Snippet" />
+
+<p class="note">
+    There is no repository framework here and no ORM. <code>DataMapper.Extensions</code> is the whole data
+    layer, and the app is a <a href="https://learn.microsoft.com/aspnet/core/blazor/server-rendering">Blazor static
+    server rendering</a> app with no interactive render mode, so there is no circuit and nothing to prerender.
+</p>
+
+@code {
+    [CascadingParameter] public HttpContext Context { get; set; } = null!;
+    private DashboardStats stats = new();
+    private string elapsed = "0 ms";
+
+    private const string Snippet = """
+        using var connection = database.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "select count(*) as total_jobs, ... from job";
+
+        using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var stats = await reader.MapToAsync<DashboardStats>(options, cancellationToken);
+        """;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var started = Stopwatch.GetTimestamp();
+
+        stats = await Jobs.GetStatsAsync(Context.RequestAborted);
+        elapsed = $"{Stopwatch.GetElapsedTime(started).TotalMilliseconds:0} ms";
+    }
+}

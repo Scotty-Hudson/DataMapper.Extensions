@@ -1,0 +1,37 @@
+@code {
+    [Parameter] public IReadOnlyList<Job> Jobs { get; set; } = [];
+}
+
+<table class="grid">
+    <thead>
+        <tr>
+            <th>Id</th>
+            <th>Customer</th>
+            <th>Status</th>
+            <th>Scheduled</th>
+            <th>Start</th>
+            <th>Duration</th>
+            <th>Amount</th>
+            <th>Notes</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var job in Jobs)
+        {
+            <tr>
+                <td><a href="/jobs/@job.JobId">@job.JobId</a></td>
+                <td>@Show(job.CustomerName)</td>
+                <td>@job.Status</td>
+                <td>@job.ScheduledOn.ToString("yyyy-MM-dd")</td>
+                <td>@job.StartTime.ToString("HH:mm")</td>
+                <td>@job.Duration.ToString(@"hh\:mm")</td>
+                <td>@(job.Amount?.ToString(CultureInfo.InvariantCulture) ?? "null")</td>
+                <td>@Show(job.Notes)</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private static string Show(string? value) => value is null ? "null" : (value == string.Empty ? "empty string" : value);
+}

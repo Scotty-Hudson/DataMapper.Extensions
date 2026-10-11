@@ -1,0 +1,68 @@
+@page "/about"
+
+<PageTitle>About</PageTitle>
+
+<h2>About this app</h2>
+
+<p class="lede">
+    A Blazor web app that uses only static server rendering: no interactive server render mode, no
+    WebAssembly, no prerendering, and no Blazor client boot script. The only client script is htmx, and
+    only for fragment swaps. It consumes
+    <a href="https://www.nuget.org/packages/DataMapper.Extensions">DataMapper.Extensions 1.0.0</a> from
+    NuGet rather than the source in this repo, so it is an ordinary consumer of the package.
+</p>
+
+<h3>What that means for the UI</h3>
+
+<p>
+    With no circuit there are no component events, so nothing in this app can respond to a click in the
+    Blazor sense. Filters travel in the query string through plain GET forms, and the actions post to
+    minimal API endpoints. Every page is one render of one component per request.
+</p>
+
+<p>
+    htmx is used where a full page reload would otherwise be the only option: the jobs filter and pager
+    swap just the results region, the streaming page appends one chunk at a time as each chunk is
+    revealed, and the archive replay swaps the archive region. Those endpoints return a fragment through
+    <code>RazorComponentResult</code>. Where htmx does not fit it is not used: a CSV download cannot be
+    swapped because the response is a file rather than markup, and dark mode is a browser preference
+    rather than something a fragment can change. Every htmx element keeps a plain <code>href</code> or
+    form action, so the app still works with the script disabled.
+</p>
+
+<h3>What the app shows</h3>
+
+<table class="grid">
+    <thead>
+        <tr><th>Page</th><th>Feature</th></tr>
+    </thead>
+    <tbody>
+        <tr><td><a href="/">Dashboard</a></td><td><code>MapToAsync</code> on an aggregate row, attributes as the only mapping configuration</td></tr>
+        <tr><td><a href="/jobs">Jobs</a></td><td><code>AddParameters</code> from a filter, and the SQL the names in it produced</td></tr>
+        <tr><td><a href="/jobs/43">Job detail</a></td><td>The <code>DataRow</code> path and <code>ConvertTo</code></td></tr>
+        <tr><td><a href="/null-policy">Null policy</a></td><td>The three policies over the same rows, with a template POCO</td></tr>
+        <tr><td><a href="/options">Options</a></td><td>Normalized names, culture, and a custom converter</td></tr>
+        <tr><td><a href="/stream">Streaming</a></td><td><code>EnumerateToAsync</code> with a cancellation token</td></tr>
+        <tr><td><a href="/export">Export</a></td><td><code>ToDataTable</code>, <code>ToDataReader</code>, CSV, and a replay into a table</td></tr>
+        <tr><td><a href="/params">Parameters</a></td><td>Object, anonymous type, and dictionary, with the <code>DbType</code> chosen for each</td></tr>
+    </tbody>
+</table>
+
+<h3>Running it</h3>
+
+<CodeSnippet Code="@run" />
+
+<p class="note">
+    The database is a SQLite file next to the project, seeded once with 1,000 rows shaped so every feature
+    has something to do: snake_case columns, text-encoded <code>Guid</code>, <code>DateOnly</code>,
+    <code>TimeOnly</code> and <code>TimeSpan</code>, nulls at regular intervals, a decimal string that a
+    German culture reads as a different number, and padded text for the converter.
+</p>
+
+<p class="note">
+    SQLite is the only dependency the example adds. The library itself still has none.
+</p>
+
+@code {
+    private const string run = "dotnet run --project examples/DataMapper.Extensions.Web";
+}

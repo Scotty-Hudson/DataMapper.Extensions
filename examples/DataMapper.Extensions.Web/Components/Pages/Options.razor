@@ -1,0 +1,156 @@
+@page "/options"
+@inject JobRepository Jobs
+
+<PageTitle>Options</PageTitle>
+
+<h2>Options</h2>
+
+<h3>MatchNormalizedNames</h3>
+
+<p class="lede">
+    <code>Technician</code> has no attributes at all, and the columns are snake_case. With the option off,
+    nothing matches and every member keeps the value the POCO started with. With it on, the same rows
+    map with no attributes in the model.
+</p>
+
+<CodeSnippet Code="@codeWithout" />
+
+<table class="grid">
+    <thead>
+        <tr><th>technician_id</th><th>first_name</th><th>last_name</th><th>email</th><th>is_active</th></tr>
+    </thead>
+    <tbody>
+        @foreach (var technician in without)
+        {
+            <tr>
+                <td>@technician.TechnicianId</td>
+                <td>@Show(technician.FirstName)</td>
+                <td>@Show(technician.LastName)</td>
+                <td>@Show(technician.Email)</td>
+                <td>@technician.IsActive</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<CodeSnippet Code="@codeWith" />
+
+<table class="grid">
+    <thead>
+        <tr><th>technician_id</th><th>first_name</th><th>last_name</th><th>email</th><th>is_active</th></tr>
+    </thead>
+    <tbody>
+        @foreach (var technician in with)
+        {
+            <tr>
+                <td>@technician.TechnicianId</td>
+                <td>@Show(technician.FirstName)</td>
+                <td>@Show(technician.LastName)</td>
+                <td>@Show(technician.Email)</td>
+                <td>@technician.IsActive</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<h3>Culture</h3>
+
+<p class="lede">
+    Job 43 stores the text <code>1.5</code> in a text column. Under the default invariant culture that is
+    one and a half. Under a German culture the period is a thousands separator, so the same value becomes
+    fifteen. This is why the package changed its default culture.
+</p>
+
+<table class="grid">
+    <thead>
+        <tr><th>Options</th><th>ConvertTo&lt;decimal&gt;("amount")</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>InvariantCulture (default)</td>
+            <td>@invariant.ToString(CultureInfo.InvariantCulture)</td>
+        </tr>
+        <tr>
+            <td>de-DE</td>
+            <td>@german.ToString(CultureInfo.InvariantCulture)</td>
+        </tr>
+    </tbody>
+</table>
+
+<h3>Converter</h3>
+
+<p class="lede">
+    The converter runs before the built-in conversion and returns null to fall back to it. Every third row
+    has padded notes, so a trimming converter has something to do.
+</p>
+
+<CodeSnippet Code="@converterCode" />
+
+<table class="grid">
+    <thead>
+        <tr><th>job_id</th><th>notes as stored</th><th>notes through the converter</th></tr>
+    </thead>
+    <tbody>
+        @foreach (var pair in zip)
+        {
+            <tr>
+                <td><a href="/jobs/@pair.Raw.JobId">@pair.Raw.JobId</a></td>
+                <td><code>@($"[{pair.Raw.Notes}]")</code></td>
+                <td><code>@($"[{pair.Converted.Notes}]")</code></td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    [CascadingParameter] public HttpContext Context { get; set; } = null!;
+    private List<Technician> without = [];
+    private List<Technician> with = [];
+    private List<(Job Raw, Job Converted)> zip = [];
+    private decimal invariant;
+    private decimal german;
+
+    private static readonly MapOptions Normalized = new() { MatchNormalizedNames = true };
+
+    private static readonly MapOptions German = new()
+    {
+        MatchNormalizedNames = true,
+        Culture = CultureInfo.GetCultureInfo("de-DE")
+    };
+
+    private static readonly MapOptions Trimming = new()
+    {
+        MatchNormalizedNames = true,
+        Converter = (value, targetType) => targetType == typeof(string) ? value.ToString()?.Trim() : null
+    };
+
+    private const string codeWithout = "reader.MapTo<Technician>(new MapOptions());   // MatchNormalizedNames is false by default";
+    private const string codeWith = "reader.MapTo<Technician>(new MapOptions { MatchNormalizedNames = true });";
+    private const string converterCode = """
+        var options = new MapOptions
+        {
+            MatchNormalizedNames = true,
+            Converter = (value, targetType) => targetType == typeof(string) ? value.ToString().Trim() : null
+        };
+        """;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var cancellationToken = Context.RequestAborted;
+
+        without = await Jobs.GetTechniciansAsync(new MapOptions(), cancellationToken);
+        with = await Jobs.GetTechniciansAsync(Normalized, cancellationToken);
+
+        var raw = await Jobs.GetSampleAsync(new Job(), Normalized, cancellationToken);
+        var trimmed = await Jobs.GetSampleAsync(new Job(), Trimming, cancellationToken);
+
+        zip = raw.Where(job => job.Notes != null).Zip(trimmed, (before, after) => (before, after)).ToList();
+
+        var row = await Jobs.GetRowAsync(43, cancellationToken);
+
+        invariant = row.ConvertTo<decimal>("amount");
+        german = row.ConvertTo<decimal>(German, "amount");
+    }
+
+    private static string Show(string? value) => value is null ? "null" : (value == string.Empty ? "empty string" : value);
+}

@@ -1,0 +1,103 @@
+@page "/params"
+@inject IDatabase Database
+
+<PageTitle>Parameters</PageTitle>
+
+<h2>Parameters</h2>
+
+<p class="lede">
+    Three ways of filling a command, and the parameters each one produced. Nothing here executes
+    anything: the library builds parameters, and this page reads the collection it filled.
+</p>
+
+<h3>From the model</h3>
+
+<CodeSnippet Code="@fromModelCode" />
+
+<ParamTable Parameters="@fromModel" />
+
+<p class="note">
+    <code>InternalNote</code> is marked <code>IgnoreMember</code>, so it is not here. <code>DateTime</code> and
+    <code>TimeSpan</code> are left at <code>DbType.Object</code> so the provider infers them from the value.
+    The enum is boxed as its underlying value, because that is what a provider can store.
+</p>
+
+<h3>From an anonymous type</h3>
+
+<CodeSnippet Code="@fromAnonymousCode" />
+
+<ParamTable Parameters="@fromAnonymous" />
+
+<p class="note">
+    An anonymous type is entirely read-only, which is why the parameter path does not use the mapper's
+    rule of skipping members with no setter. Under that rule an anonymous type would produce nothing.
+    A null argument carries no type, so its <code>DbType</code> is <code>Object</code>.
+</p>
+
+<h3>From a dictionary</h3>
+
+<CodeSnippet Code="@fromDictionaryCode" />
+
+<ParamTable Parameters="@fromDictionary" />
+
+<p class="note">
+    A dictionary is read as name and value pairs, not as a POCO: <code>Dictionary&lt;string, int&gt;</code>
+    binds its entries rather than its properties. A null value becomes <code>DBNull.Value</code> because a
+    parameter has no POCO to apply a null policy to.
+</p>
+
+@code {
+    private List<BoundParameter> fromModel = [];
+    private List<BoundParameter> fromAnonymous = [];
+    private List<BoundParameter> fromDictionary = [];
+
+    private const string fromModelCode = """
+        command.AddParameters(job);   // names come from the Column attributes
+        """;
+
+    private const string fromAnonymousCode = """
+        command.AddParameters(new { job_id = 42L, status = JobStatus.Completed, notes = (string?)null });
+        """;
+
+    private const string fromDictionaryCode = """
+        command.AddParameters(new Dictionary<string, int> { ["job_id"] = 42, ["page_size"] = 25 });
+        """;
+
+    protected override void OnInitialized()
+    {
+        using var connection = Database.Open();
+
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "select * from job where job_id = @job_id and status = @status";
+            command.AddParameters(new Job
+            {
+                JobId = 42,
+                CustomerName = "customer-42",
+                Status = JobStatus.Completed,
+                Key = Guid.NewGuid(),
+                ScheduledOn = new DateOnly(2026, 3, 4),
+                StartTime = new TimeOnly(9, 30),
+                Duration = TimeSpan.FromMinutes(45),
+                Amount = 12.5m,
+                TechnicianId = 3,
+                Notes = null,
+                DisplayLabel = "job-42"
+            });
+
+            fromModel = ParameterInspector.Inspect(command, "Job model");
+        }
+
+        using (var command = connection.CreateCommand())
+        {
+            command.AddParameters(new { job_id = 42L, status = JobStatus.Completed, notes = (string?)null });
+            fromAnonymous = ParameterInspector.Inspect(command, "anonymous type");
+        }
+
+        using (var command = connection.CreateCommand())
+        {
+            command.AddParameters(new Dictionary<string, int> { ["job_id"] = 42, ["page_size"] = 25 });
+            fromDictionary = ParameterInspector.Inspect(command, "Dictionary<string, int>");
+        }
+    }
+}

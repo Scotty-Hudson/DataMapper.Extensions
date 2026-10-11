@@ -1,0 +1,95 @@
+@page "/export"
+@inject JobRepository Jobs
+@inject IAntiforgery Antiforgery
+
+@code {
+    [CascadingParameter] public HttpContext Context { get; set; } = null!;
+
+    private const int Limit = 50;
+
+    private JobFilter filter = new();
+    private DataTable table = new("JobExport");
+    private List<JobExport> archivedRows = [];
+    private Microsoft.AspNetCore.Antiforgery.AntiforgeryTokenSet tokens = null!;
+    private int archived;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var cancellationToken = Context.RequestAborted;
+
+        filter = JobFilter.FromQuery(Context.Request.Query);
+        archived = int.TryParse(Context.Request.Query["archived"], out var count) ? count : 0;
+
+        table = await Jobs.ExportTableAsync(filter, Limit, cancellationToken);
+        archivedRows = await Jobs.GetArchivedAsync(Limit, cancellationToken);
+
+        tokens = Antiforgery.GetAndStoreTokens(Context);
+    }
+}
+
+<PageTitle>Export</PageTitle>
+
+<h2>Export</h2>
+
+<p class="lede">
+    The other direction. The same attributes that produced the columns on the way in produce the
+    columns here, and <code>IgnoreMember</code> members are left out of both.
+</p>
+
+<CodeSnippet Code="@snippet" />
+
+<h3>The table <code>ToDataTable</code> built</h3>
+
+<p class="note">
+    Column names come from the member names or from a <code>Column</code> attribute, and a nullable
+    member produces a column of the underlying type: <code>decimal?</code> becomes <code>Decimal</code>,
+    and <code>string?</code> stays <code>String</code> because a column has no nullability.
+</p>
+
+<table class="grid">
+    <thead>
+        <tr><th>Column</th><th>CLR type</th></tr>
+    </thead>
+    <tbody>
+        @foreach (DataColumn column in table.Columns)
+        {
+            <tr>
+                <td><code>@column.ColumnName</code></td>
+                <td>@column.DataType.Name</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@* A file download cannot be an htmx swap: the response is not markup, it is the file. This form
+   stays a plain form, which is the honest boundary. *@
+<form method="post" action="/export/csv" class="filter">
+    <input type="hidden" name="__RequestVerificationToken" value="@tokens.RequestToken" />
+    <input type="hidden" name="customer_like" value="@filter.CustomerLike" />
+    <input type="hidden" name="status" value="@filter.Status" />
+
+    <button type="submit">Download CSV</button>
+    <span class="quiet">first @Limit rows of the current filter</span>
+</form>
+
+<form method="post" action="/export/archive" hx-post="/export/archive" hx-target="#archive" hx-swap="outerHTML" class="filter">
+    <input type="hidden" name="__RequestVerificationToken" value="@tokens.RequestToken" />
+    <input type="hidden" name="customer_like" value="@filter.CustomerLike" />
+    <input type="hidden" name="status" value="@filter.Status" />
+
+    <button type="submit">Replay into the archive table</button>
+    <span class="quiet">the records become a DbDataReader, then a transaction</span>
+</form>
+
+<ArchiveResult Inserted="@archived" Rows="@archivedRows" />
+
+@code {
+    private const string snippet = """
+        var table = rows.ToDataTable("JobExport");
+        var reader = rows.ToDataReader("JobExport");
+
+        // On SQL Server this is one call. SQLite has no bulk copy, so the same reader is
+        // read row by row inside a transaction.
+        await bulkCopy.WriteToServerAsync(reader);
+        """;
+}

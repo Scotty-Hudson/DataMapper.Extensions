@@ -1,0 +1,74 @@
+@page "/stream"
+@inject JobRepository Repository
+
+@code {
+    [CascadingParameter] public HttpContext Context { get; set; } = null!;
+
+    private JobFilter filter = new();
+    private StreamResult chunk = null!;
+    private int limit = 25;
+    private int cancelAfter = 10;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var query = Context.Request.Query;
+
+        if (int.TryParse(query["limit"], out var requested)) limit = Math.Clamp(requested, 1, 200);
+        if (int.TryParse(query["cancel_after"], out var after)) cancelAfter = Math.Clamp(after, 0, 200);
+
+        filter = JobFilter.FromQuery(query);
+
+        chunk = await Repository.GetChunkAsync(filter, after: 0, limit, cancelAfter > 0 ? cancelAfter : null,
+            Context.RequestAborted);
+    }
+}
+
+<PageTitle>Streaming</PageTitle>
+
+<h2>Streaming</h2>
+
+<p class="lede">
+    <code>EnumerateToAsync</code> yields one record at a time, so a result set that does not fit in
+    memory can still be read, and the token is checked between records. htmx is what shows that
+    incrementally: each chunk asks for the next one when it is revealed, and the chain stops when a
+    chunk comes back with no more rows.
+</p>
+
+<p class="note">
+    Each chunk is its own request, so the cursor is a <code>job_id</code> rather than a live reader.
+    Nothing can survive between requests, which is the honest limit of doing this without a circuit.
+    Without htmx this page shows the first chunk only.
+</p>
+
+<form method="get" action="/stream" class="filter fields">
+    <label>
+        Rows per chunk
+        <input type="number" name="limit" value="@limit" min="1" max="200" />
+    </label>
+
+    <label>
+        Cancel after
+        <input type="number" name="cancel_after" value="@cancelAfter" min="0" max="200" />
+    </label>
+
+    <label>
+        Customer contains
+        <input type="text" name="customer_like" value="@filter.CustomerLike" />
+    </label>
+
+    <div class="field">
+        <span>&nbsp;</span>
+        <button type="submit">Run</button>
+    </div>
+</form>
+
+<CodeSnippet Code="@snippet" />
+
+<StreamChunk Chunk="@chunk" FilterQuery="@filter.ToFilterQueryString()" />
+
+@code {
+    private const string snippet = """
+        await foreach (var job in reader.EnumerateToAsync<Job>(options, cancellationToken))
+            Handle(job);
+        """;
+}

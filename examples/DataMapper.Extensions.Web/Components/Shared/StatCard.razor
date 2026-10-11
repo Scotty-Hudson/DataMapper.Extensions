@@ -1,0 +1,14 @@
+@code {
+    [Parameter] public string Label { get; set; } = string.Empty;
+    [Parameter] public string Value { get; set; } = string.Empty;
+    [Parameter] public string Note { get; set; } = string.Empty;
+}
+
+<div class="card">
+    <span class="card-label">@Label</span>
+    <span class="card-value">@Value</span>
+    @if (!string.IsNullOrEmpty(Note))
+    {
+        <span class="card-note">@Note</span>
+    }
+</div>

@@ -7,5 +7,6 @@
   </Folder>
   <Folder Name="/examples/">
     <Project Path="examples/DataMapper.Extensions.Example/DataMapper.Extensions.Example.csproj" />
+    <Project Path="examples/DataMapper.Extensions.Web/DataMapper.Extensions.Web.csproj" />
   </Folder>
 </Solution>
