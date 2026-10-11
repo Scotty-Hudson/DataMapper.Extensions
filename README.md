@@ -334,6 +334,22 @@ trigger because they all reject null keys. The last one is the await-continuatio
 compiler generates for the async state machine; it is only taken when a reader completes
 `ReadAsync` asynchronously, which the in-memory reader in the tests never does.
 
+## Publishing
+
+```bash
+dotnet pack --configuration Release
+
+dotnet nuget push bin/Release/*.nupkg \
+  --source https://api.nuget.org/v3/index.json \
+  --api-key <your-api-key>
+```
+
+The API key comes from <https://www.nuget.org/account/apikeys> and needs the Publish scope. Pack
+produces a `.snupkg` as well, which is what lets consumers step through the source in a debugger.
+
+CI publishes on a `v*` tag or a manual run from the Actions tab, using the `NUGET_API_KEY`
+repository secret.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

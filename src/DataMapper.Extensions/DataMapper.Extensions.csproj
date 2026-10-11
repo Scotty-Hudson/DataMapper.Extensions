@@ -14,6 +14,11 @@
     <PackageTags>data;ado.net;datarow;datatable;idatareader;poco;mapping;parameters</PackageTags>
     <RepositoryUrl>https://github.com/Scotty-Hudson/DataMapper.Extensions</RepositoryUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+
+    <!-- Ships a .snupkg alongside the package so consumers can step through the
+         source in the debugger instead of seeing decompiled code. -->
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 
   <ItemGroup>
