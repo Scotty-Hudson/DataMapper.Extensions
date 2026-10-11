@@ -333,3 +333,7 @@ switch, and the null-key guard on the dictionary path, which no standard diction
 trigger because they all reject null keys. The last one is the await-continuation check the
 compiler generates for the async state machine; it is only taken when a reader completes
 `ReadAsync` asynchronously, which the in-memory reader in the tests never does.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

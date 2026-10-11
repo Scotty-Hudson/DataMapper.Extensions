@@ -9,6 +9,7 @@
     <PackageId>DataMapper.Extensions</PackageId>
     <Version>1.0.0</Version>
     <Authors>Scotty Hudson &lt;scotty@scottyhudson.org&gt;</Authors>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Description>Extension methods that map IDataReader, DataTable and DataRow rows onto POCOs, map POCOs back into a DataTable or DbDataReader, and bind parameters from an object onto a DbCommand.</Description>
     <PackageTags>data;ado.net;datarow;datatable;idatareader;poco;mapping;parameters</PackageTags>
     <RepositoryUrl>https://github.com/Scotty-Hudson/DataMapper.Extensions</RepositoryUrl>
